@@ -57,7 +57,7 @@ SOCKET tcpListen(std::string hostname, std::string port){
         hints.ai_flags = AI_PASSIVE;
         std::cout << hostname << " : " << port << std::endl;
 
-        int isError = getaddrinfo(hostname.c_str(), port.c_str(), &hints, &result);
+        int isError = getaddrinfo(NULL, port.c_str(), &hints, &result);//名前解決不可のため、第一引数はNULLに設定
         if(isError != 0){
             std::cerr << gai_strerror(isError) << std::endl;
             throw std::runtime_error("Error: getaddrinfo(): failed");
@@ -98,6 +98,7 @@ SOCKET tcpListen(std::string hostname, std::string port){
         }
         std::cout << "sockfd = " << sockfd << std::endl;
         printf("Listen succeeded\n"); 
+        std::cout << "----------------------------------------------" << std::endl;
         return sockfd;
 }
 
@@ -195,6 +196,11 @@ void Config::exploreServerBlock(std::ifstream *ifs){
 
 
 void Config::exploreLocationBlock(VirtualServer *server, std::ifstream *ifs, std::string locationPath){
+
+    // std::cout << "----------------------------" << std::endl;
+    // std::cout << locationPath << std::endl;
+    // std::cout << "----------------------------" << std::endl;
+
     Location *location = new Location(locationPath);
     std::string line;
     bool isEndBrace = false;
@@ -219,7 +225,7 @@ void Config::exploreLocationBlock(VirtualServer *server, std::ifstream *ifs, std
                 throw std::runtime_error("Error: "+line); 
             case DIRECTIVE:
                 //std::cerr << "debug: " << line << " = directive" << std::endl;
-                location->setSetting(getDirectiveNameInLine(line), getDirectiveContentInLine(line, DIRECTIVE));
+                location->setSetting(getDirectiveNameInLine(line), getDirectiveContentInLine(line, LOCATION_DIRECTIVE));
                 break;
             case EMPTY:
                 break;

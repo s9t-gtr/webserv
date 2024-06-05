@@ -44,8 +44,9 @@ std::string VirtualServer::getListenPort(){
     return serverSetting["listen"];
 }
 void VirtualServer::setLocation(std::string locationPath, Location *location){
-    if(locations.find(locationPath) != locations.end())
-        throw std::runtime_error("server: "+locationPath+" is duplicate");
+    // if(locations.find(locationPath) != locations.end())
+    //     throw std::runtime_error("server: "+locationPath+" is duplicate");
+    // 一つのserverブロックに複数のlocationブロックを設定すると、ここでひっかかるので一時的にコメントアウト
     locations[locationPath] = location;
 }
 

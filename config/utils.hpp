@@ -10,6 +10,7 @@
 #define SERVER_BLOCK 2
 #define LOCATION_BLOCK 3
 #define DIRECTIVE 4
+#define LOCATION_DIRECTIVE 5 //getDirectiveContentInLineを修正すると、他の呼び出し場所でエラーになるので、新しく作ったマクロナンバーで条件分岐させて処理する
 
 bool isEndBraceLine(std::string line);
 void cutPrefixSpace(std::string& line);

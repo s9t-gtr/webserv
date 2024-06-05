@@ -29,7 +29,7 @@ typedef std::vector<std::string> strVec;
 typedef std::set<int> socketSet;
 
 class Config{
-    private:
+    public:
         static serversMap servers_;
         static std::string configPath_;
         static std::string httpDirectives_[]; 

@@ -45,14 +45,17 @@ std::string getDirectiveContentInLine(std::string line, int type){
    //この関数を使う時にはcontentを持つdirectiveであることが保証されている必要がある 
     size_t len = line.size();
     if(type == LOCATION_BLOCK){
-       if(line.substr(0, 9) == "location "){
-            std::string path = line.substr(10, len-2); 
+       if(line.substr(0, 10) == "\tlocation "){//行の先頭のタブを含めるように修正
+            std::string path = line.substr(10, len - (10 + 1));//substr 関数の第二引数には取得したい文字列の長さを指定する
             return path;
        }
     }
+    if(type == LOCATION_DIRECTIVE){
+        size_t nameLen = getDirectiveNameInLine(line).size() + prefixSpaceCount(line);
+            return line.substr(nameLen+1, len - (nameLen+1 + 1));
+    }
     size_t nameLen = getDirectiveNameInLine(line).size() + prefixSpaceCount(line);
-    return line.substr(nameLen+1, len-2);
-    
+    return line.substr(nameLen+1, len - 2);
 }
 
 bool isLocationDirective(std::string line){
