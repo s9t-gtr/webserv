@@ -44,9 +44,9 @@ std::string VirtualServer::getListenPort(){
     return serverSetting["listen"];
 }
 void VirtualServer::setLocation(std::string locationPath, Location *location){
-    // if(locations.find(locationPath) != locations.end())
-    //     throw std::runtime_error("server: "+locationPath+" is duplicate");
-    // 一つのserverブロックに複数のlocationブロックを設定すると、ここでひっかかるので一時的にコメントアウト
+    if(locations.find(locationPath) != locations.end())
+        throw std::runtime_error("server: "+locationPath+" is duplicate");
+    // 一つのserverブロックに複数のlocationブロックを設定すると、ここでひっかかるので一時的にコメントアウト->修正済み
     locations[locationPath] = location;
 }
 
@@ -95,11 +95,9 @@ void VirtualServer::confirmErrorPage(){
         return;
     }
     std::vector<std::string>status = split(serverSetting["error_page"], ' ');
-    for(std::vector<std::string>::iterator it=status.begin(); it != status.end();it++){
-        if(*it == "404")
-            return;
-    }
-    serverSetting["error_page"] = "404 "+serverSetting["error_page"];
+    std::vector<std::string>::iterator it=status.begin();
+    if(*it != "404")
+        throw std::runtime_error("Error: select 404"); //error_pageの設定は404のみに対応させる
 }
 
 

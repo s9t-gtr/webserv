@@ -127,38 +127,6 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
 
 void HttpConnection::sendResponse(Config *conf, RequestParse& requestInfo, SOCKET sockfd){
     // -------------リクエストごとに振り分ける処理を追加-------------
-
-
-    // RequestParse requestInfo(request);のところで、クライアントからのリクエストをパース
-    // ->リクエストされたホスト名に対応したVirtualServerインスタンスを取得
-    // ->その中のlocationブロックのリストと、リクエストされたパスを比較
-    // ->当てはまるディレクトリもしくはファイルを提供する
-
-
-
-    // ----------------------configの中身の確認-------------------------
-    // std::cout << requestInfo.getHostName() << std::endl;
-    // std::cout << requestInfo.getPath() << std::endl;
-
-    // for (std::map<std::string, VirtualServer*>::iterator it = conf->servers_.begin(); it != conf->servers_.end(); ++it) {
-    //     std::cout << "Key: " << it->first << ", Value: " << it->second << std::endl;
-    // }
-
-    // VirtualServer selected_server = conf->getServer(requestInfo.getHostName());
-
-    // for (std::map<std::string, Location*>::iterator it = selected_server.locations.begin(); it != selected_server.locations.end(); ++it) {
-    //     Location* location = it->second;
-    //     std::cout << location->path << std::endl;
-    // }
-
-    // Location *location = selected_server.locations.begin()->second;
-    // std::cout << location->path << std::endl;
-    // std::map<std::string, std::string>::iterator it = location->locationSetting.begin();
-    // it++;
-    // std::cout << it->second << std::endl;
-    // ----------------------configの中身の確認-------------------------
-
-
     if (requestInfo.getMethod() == "GET")
     {
         //redirect

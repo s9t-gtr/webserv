@@ -14,7 +14,7 @@ Config::Config(std::string configPath){
 Config::~Config(){}
 
 std::string Config::httpDirectives_[] = {""};
-std::string Config::serverDirectives_[] = {"cgi_path", "server_name", "client_max_body_size", "index", "listen", "rewrite", "root", ""};
+std::string Config::serverDirectives_[] = {"cgi_path", "server_name", "client_max_body_size", "error_page", "index", "listen", "rewrite", "root", ""};
 std::string Config::locationDirectives_[] = {"index", "rewrite", "root", ""};
 
 /*========================================
@@ -26,6 +26,7 @@ Config* Config::getInstance(std::string configPath){
         inst = new Config(configPath);
         readConfig(inst);
         std::cout << ".conf file completed" << std::endl;
+        std::cout << "----------------------------------------------" << std::endl;//出力結果をみやすく
     }catch(std::bad_alloc& e){
         std::cerr<< "Error: Failed new Config() " << std::endl;
         std::exit(EXIT_FAILURE); 

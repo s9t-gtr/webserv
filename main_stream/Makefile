@@ -33,6 +33,8 @@ all: $(NAME) $(CGI) $(CGI_POST)
 
 clean: 
 	rm -rf $(OBJS)
+	rm -rf test.cgi.dSYM
+	rm -rf upload.cgi.dSYM
 
 fclean: clean
 	rm -rf $(NAME) ../cgi/$(CGI) ../cgi_post/$(CGI_POST)

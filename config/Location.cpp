@@ -45,6 +45,6 @@ void Location::setSetting(std::string directiveName, std::string directiveConten
     locationSetting[directiveName] = directiveContent;
 }
 std::string Location::getLocationPath(){
+    locationSetting["locationPath"] = path;//この行追加で複数location格納成功
     return locationSetting["locationPath"];
 }
-

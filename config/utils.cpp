@@ -64,7 +64,7 @@ bool isLocationDirective(std::string line){
     if(line[len-1] != '{')
         return false;
     cutPrefixSpace(line);
-    std::cout << line.substr(0, 9) << std::endl;
+    // std::cout << line.substr(0, 9) << std::endl; //なぜか出力される”location”をなくす
     if(line.substr(0, 9) == "location "){
         std::string path = line.substr(10, len-1-10); 
         while(path[i]){ //「正常なpathである＝pathがあるべき場所に１つの文字列が入っていること」とする。ここでそのpathが存在するものかのチェックをするかは迷いどころです
@@ -88,7 +88,6 @@ static bool isAllSpace(std::string line){
 }
 
 int getDirectiveType(std::string line, bool(*isAppropriateDirectiveForBlock)(std::string, std::string[]), std::string AppropriateDirectices[]){
-    
     if(line.empty() || isAllSpace(line)){
         return EMPTY;
     }else if(line == "server{"){
