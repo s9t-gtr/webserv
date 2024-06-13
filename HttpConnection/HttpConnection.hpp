@@ -3,6 +3,10 @@
 
 #include "../config/Config.hpp"
 #include "../request/RequestParse.hpp"
+#include <dirent.h>
+#include <sstream>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 typedef struct timespec timespec;
 typedef std::map<int, struct kevent*> keventMap;
@@ -39,6 +43,17 @@ class HttpConnection{
         void sendResponse(Config *conf, RequestParse& requestInfo, SOCKET sockfd);
         void executeCgi(Config *conf, RequestParse& requestInfo, int *pipe_c2p);
         void createResponseFromCgiOutput(pid_t pid, SOCKET sockfd, int pipe_c2p[2]);
+
+        void sendDefaultErrorPage(SOCKET sockfd);
+        void sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd);
+        std::string getGmtDate();
+        void sendStaticPage(RequestParse& requestInfo, SOCKET sockfd);
+        void sendRedirectPage(SOCKET sockfd);
+        void postProcess(RequestParse& requestInfo, SOCKET sockfd);
+        void executeCgi_postVersion(RequestParse& requestInfo, int pipe_c2p[2]);
+        void sendForbiddenPage(SOCKET sockfd);
+        void deleteProcess(RequestParse& requestInfo, SOCKET sockfd);
+        void sendNotImplementedPage(SOCKET sockfd);
 };
 
 #endif

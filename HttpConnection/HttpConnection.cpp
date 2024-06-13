@@ -64,10 +64,12 @@ void HttpConnection::eventRegister(SOCKET fd){
 
 void HttpConnection::startEventLoop(Config *conf, socketSet tcpSockets){
     while(1){
-        size_t nevent = kevent(kq, NULL, 0, eventlist, sizeof(*eventlist), NULL);
-        for(size_t i = 0; i<nevent;i++){
+        //---------size_tをssize_tに修正-----------//
+        ssize_t nevent = kevent(kq, NULL, 0, eventlist, sizeof(*eventlist), NULL);
+        for(ssize_t i = 0; i<nevent;i++){
             eventExecute(conf, eventlist[i].ident, tcpSockets);
         }
+        //---------size_tをssize_tに修正-----------//
     }
 }
 
@@ -84,6 +86,13 @@ void HttpConnection::establishTcpConnection(SOCKET sockfd){
     struct sockaddr_storage client_sa;  // sockaddr_in 型ではない。 
     socklen_t len = sizeof(client_sa);   
     int newSocket = accept(sockfd, (struct sockaddr*) &client_sa, &len);
+    //----------acceptのエラー処理追加------------
+    if (newSocket < 0)
+    {
+        perror("accept");
+        std::exit(EXIT_FAILURE);
+    }
+    //----------acceptのエラー処理追加------------
     createNewEvent(newSocket);
     eventRegister(newSocket);
     std::cout << "event socket = " << sockfd << std::endl;
@@ -103,16 +112,61 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
         RequestParse requestInfo(request);
         sendResponse(conf, requestInfo, sockfd);
     }   
+
+    //----------recvのエラー処理追加------------
+    else if (bytesReceived == 0) //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
+        close(sockfd); //返り値が0のときは接続の失敗
+    else 
+    {
+        perror("recv error"); //返り値が-1のときはシステムコールの失敗
+        close(sockfd);
+        std::exit(EXIT_FAILURE);
+    }
+    //----------recvのエラー処理追加------------
 }
 
 void HttpConnection::sendResponse(Config *conf, RequestParse& requestInfo, SOCKET sockfd){
-    int pipe_c2p[2];
-    if(pipe(pipe_c2p) < 0)
-        throw std::runtime_error("Error: pipe() failed");
-    pid_t pid = fork();
-    if(pid == 0)
-        executeCgi(conf, requestInfo, pipe_c2p);
-    createResponseFromCgiOutput(pid, sockfd, pipe_c2p);
+    // -------------リクエストごとに振り分ける処理を追加-------------
+    if (requestInfo.getMethod() == "GET")
+    {
+        //redirect
+        if (requestInfo.getPath() == "/google")
+            sendRedirectPage(sockfd);
+        //autoindex
+        else if (requestInfo.getPath().substr(0, 11) == "/autoindex/")
+            sendAutoindexPage(requestInfo, sockfd);
+        //cgi
+        else if (requestInfo.getPath() == "/cgi/test.cgi")//<- .cgi実行ファイルもMakefileで作成・削除できるようにする
+        {
+            int pipe_c2p[2];
+            if(pipe(pipe_c2p) < 0)
+                throw std::runtime_error("Error: pipe() failed");
+            pid_t pid = fork();
+            if(pid == 0)
+                executeCgi(conf, requestInfo, pipe_c2p);
+            createResponseFromCgiOutput(pid, sockfd, pipe_c2p);
+        }
+        //その他の静的ファイルまたはディレクトリ
+        else
+            sendStaticPage(requestInfo, sockfd);
+    }
+    else if (requestInfo.getMethod() == "POST")
+    {
+        if (requestInfo.getPath() == "/upload/")// リクエストパスがアップロード可能なディレクトリならファイルの作成
+            postProcess(requestInfo, sockfd);
+        else//メソッドがPOSTなのにリクエストパスが"/upload/"以外の場合
+            sendForbiddenPage(sockfd);
+    }
+    else if (requestInfo.getMethod() == "DELETE")
+    {
+        if (requestInfo.getPath().substr(0, 8) == "/upload/")// リクエストパスがアップロード可能なディレクトリならファイルの削除
+            deleteProcess(requestInfo, sockfd);
+        else//メソッドがDELETEなのにリクエストパスが"/upload/"以外の場合
+            sendForbiddenPage(sockfd);
+    }
+    else //GET,POST,DELETE以外の実装していないメソッド
+        sendNotImplementedPage(sockfd);
+    // -------------リクエストごとに振り分ける処理を追加-------------
 }
 
 void HttpConnection::executeCgi(Config *conf, RequestParse& requestInfo, int pipe_c2p[2]){
