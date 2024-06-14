@@ -8,7 +8,7 @@
 typedef std::map<std::string, std::string> locationMap;
 
 class Location{
-    private:
+    public:
         std::string path;
         locationMap locationSetting;
         

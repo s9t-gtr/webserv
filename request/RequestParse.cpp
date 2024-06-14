@@ -91,13 +91,38 @@ void RequestParse::bodyUnChunk(strVec linesVec, strVec::iterator itFromBody){
     }
     body = bodyString; 
 }
+// POSTメソッドでリクエストボディを追加するとこの関数でエラーになってしまう
+// std::string RequestParse::createBodyStringFromLinesVector(strVec linesVec, strVec::iterator itFromBody){
+//     std::string bodyString;
+//     for(strVec ::iterator it=itFromBody;it!=linesVec.end();it++){
+//         *it = *it+'\n';
+//         bodyString += *it;
+//     }
+//     bodyString.pop_back();
+//     return bodyString;
+// }
+
 std::string RequestParse::createBodyStringFromLinesVector(strVec linesVec, strVec::iterator itFromBody){
-    std::string bodyString;
-    for(strVec ::iterator it=itFromBody;it!=linesVec.end();it++){
-        *it = *it+'\n';
-        bodyString += *it;
+    (void)itFromBody;//itFromBodyがエラーの原因かも？
+
+    // linesVecの先頭からみていく。改行が二回連続したら、それ以降をリクエストボディとして格納
+
+    std::string bodyString = "";
+
+    bool skipMode = true; // 初めはスキップモード
+
+    // linesVec から文字列を抽出
+    for (strVec::iterator it = linesVec.begin(); it != linesVec.end(); ++it)
+    {
+        if (skipMode)// スキップモード中の処理
+        {
+            if (static_cast<int>((*it)[0]) == 13) // if (*it == "\n")ではなぜかうまくいかない
+                skipMode = false; // 改行が2回連続したらスキップモードを解除
+        }
+        else// スキップ後の処理
+            bodyString += *it; // 抽出された文字列に要素を追加
     }
-    bodyString.pop_back();
+
     return bodyString;
 }
 

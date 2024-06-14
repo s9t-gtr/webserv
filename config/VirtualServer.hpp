@@ -11,7 +11,7 @@ typedef std::map<std::string, Location*> locationsMap;
 #define ERROR_PAGE_404 "documents/404.html"
 class Location;
 class VirtualServer{
-    private:
+    public:
         serverMap serverSetting;
         locationsMap locations;
         bool isDefault ;
