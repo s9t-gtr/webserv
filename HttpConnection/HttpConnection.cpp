@@ -90,7 +90,7 @@ void HttpConnection::establishTcpConnection(SOCKET sockfd){
     if (newSocket < 0)
     {
         perror("accept");
-        std::exit(EXIT_FAILURE);
+        return;
     }
     //----------acceptのエラー処理追加------------
     createNewEvent(newSocket);
@@ -125,16 +125,64 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
     //----------recvのエラー処理追加------------
 }
 
+std::string HttpConnection::selectLocationSetting(std::map<std::string, Location*> &locations, std::string request_path)
+{
+    std::string bestMatch = "";
+    for (std::map<std::string, Location*>::const_iterator it = locations.begin(); it != locations.end(); ++it)
+    {
+        if (it->second->locationSetting.find("locationPath") != it->second->locationSetting.end())
+        {
+            const std::string &locationPath = it->second->locationSetting["locationPath"];
+            if (request_path.substr(0, locationPath.size()) == locationPath)
+            {
+                if (locationPath.size() > bestMatch.size())
+                    bestMatch = locationPath;
+            }
+        }
+    }
+    return (bestMatch);
+}
+
+bool HttpConnection::isAllowedMethod(Location* location, std::string method)
+{
+    if(location->locationSetting["allow_method"] == "none")
+        return true;
+    std::vector<std::string>status = split(location->locationSetting["allow_method"], ' ');
+    for (std::vector<std::string>::iterator it = status.begin(); it != status.end(); ++it)
+    {
+        if (*it == method)
+            break;
+        if (it == status.end() - 1)
+            return false;
+    }
+    return true;
+}
+
 void HttpConnection::sendResponse(Config *conf, RequestParse& requestInfo, SOCKET sockfd){
+    //今回指定されたバーチャルサーバーの設定情報を使いたいのでインスタンス化
+    VirtualServer* server = conf->getServer(requestInfo.getHostName());
+
+    //今回指定されたlocationパスの設定情報を使いたいのでインスタンス化
+    std::string location_path = selectLocationSetting(server->locations, requestInfo.getPath());
+    Location* location = server->locations[location_path];
+
+    // std::cout << "========" << location->path << "========" << std::endl;//デバッグ
+
     // -------------リクエストごとに振り分ける処理を追加-------------
     if (requestInfo.getMethod() == "GET")
     {
-        //redirect
-        if (requestInfo.getPath() == "/google")
-            sendRedirectPage(sockfd);
-        //autoindex
-        else if (requestInfo.getPath().substr(0, 11) == "/autoindex/")
-            sendAutoindexPage(requestInfo, sockfd);
+        // allow_methodが設定され、かつGETが含まれていなかった場合
+        if (isAllowedMethod(location, "GET") == false)
+        {
+            sendNotAllowedPage(sockfd);
+            return ;
+        }
+        // redirec ->location設定の中で最優先
+        if (location->locationSetting["return"] != "none")
+            sendRedirectPage(sockfd, location);
+        //autoindex ->sendStaticPage関数内に移動
+        // else if (requestInfo.getPath().substr(0, 11) == "/autoindex/")
+        //     sendAutoindexPage(requestInfo, sockfd, server, location);
         //cgi
         else if (requestInfo.getPath() == "/cgi/test.cgi")//<- .cgi実行ファイルもMakefileで作成・削除できるようにする
         {
@@ -148,19 +196,31 @@ void HttpConnection::sendResponse(Config *conf, RequestParse& requestInfo, SOCKE
         }
         //その他の静的ファイルまたはディレクトリ
         else
-            sendStaticPage(requestInfo, sockfd);
+            sendStaticPage(requestInfo, sockfd, server, location);
     }
     else if (requestInfo.getMethod() == "POST")
     {
+        // allow_methodが設定され、かつPOSTが含まれていなかった場合
+        if (isAllowedMethod(location, "POST") == false)
+        {
+            sendNotAllowedPage(sockfd);
+            return ;
+        }
         if (requestInfo.getPath() == "/upload/")// リクエストパスがアップロード可能なディレクトリならファイルの作成
-            postProcess(requestInfo, sockfd);
+            postProcess(requestInfo, sockfd, server);
         else//メソッドがPOSTなのにリクエストパスが"/upload/"以外の場合
             sendForbiddenPage(sockfd);
     }
     else if (requestInfo.getMethod() == "DELETE")
     {
+        // allow_methodが設定され、かつDELETEが含まれていなかった場合
+        if (isAllowedMethod(location, "DELETE") == false)
+        {
+            sendNotAllowedPage(sockfd);
+            return ;
+        }
         if (requestInfo.getPath().substr(0, 8) == "/upload/")// リクエストパスがアップロード可能なディレクトリならファイルの削除
-            deleteProcess(requestInfo, sockfd);
+            deleteProcess(requestInfo, sockfd, server);
         else//メソッドがDELETEなのにリクエストパスが"/upload/"以外の場合
             sendForbiddenPage(sockfd);
     }
@@ -174,8 +234,8 @@ void HttpConnection::executeCgi(Config *conf, RequestParse& requestInfo, int pip
     dup2(pipe_c2p[W],1);
     close(pipe_c2p[W]);
     extern char** environ;
-    VirtualServer server = conf->getServer(requestInfo.getHostName());
-    std::string cgiPath = server.getCgiPath();
+    VirtualServer* server = conf->getServer(requestInfo.getHostName());
+    std::string cgiPath = server->getCgiPath();
     char* const cgi_argv[] = { const_cast<char*>(cgiPath.c_str()), NULL };
     if(execve("../cgi/test.cgi", cgi_argv, environ) < 0)
         std::cout << "Error: execve() failed" << std::endl;

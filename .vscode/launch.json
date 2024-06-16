@@ -9,7 +9,7 @@
             "request": "launch",
             "name": "Debug",
             "program": "${workspaceFolder}/main_stream/webserv",
-            "args": ["configures/example.conf"],
+            "args": ["configures/test.conf"],
             "cwd": "${workspaceFolder}"
         }
     ]

@@ -193,7 +193,8 @@ std::string RequestParse::getHostName(){
     std::string directive = getHeader("Host");
     if(directive != ""){
         strVec spDirective = split(directive, ':');
-        return spDirective[0];
+
+        return spDirective.size() != 2 ? "localhost" : spDirective[0];
     }
     return "";
 }

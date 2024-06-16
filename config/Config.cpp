@@ -14,8 +14,8 @@ Config::Config(std::string configPath){
 Config::~Config(){}
 
 std::string Config::httpDirectives_[] = {""};
-std::string Config::serverDirectives_[] = {"cgi_path", "server_name", "client_max_body_size", "error_page", "index", "listen", "rewrite", "root", ""};
-std::string Config::locationDirectives_[] = {"index", "rewrite", "root", ""};
+std::string Config::serverDirectives_[] = {"cgi_path", "server_name", "client_max_body_size", "error_page", "listen", ""};
+std::string Config::locationDirectives_[] = {"index", "root", "allow_method", "autoindex", "return", ""};
 
 /*========================================
         public member functions
@@ -109,7 +109,7 @@ socketSet Config::getTcpSockets(){
         std::string tmpHostname = it->second->getServerName();
         std::string tmpPort = it->second->getListenPort();
         // const char* hostname = tmpHostname != "" ? tmpHostname.c_str() : NULL;
-        tmpHostname = tmpHostname != "" ? tmpHostname : NULL;
+        // tmpHostname = tmpHostname != "" ? tmpHostname : NULL; //std::stringにNULLを代入？->segv
         // const char* port = tmpPort.c_str();
         SOCKET sockfd = tcpListen(tmpHostname, tmpPort);
         set.insert(sockfd);
@@ -144,8 +144,7 @@ void Config::exploreHttpBlock(std::ifstream *ifs){
                 //std::cerr << "debug: " << line << "空の行" << std::endl;
                 break;
             case ERROR:
-                std::cerr << WARNING << std::endl;
-
+                throw std::runtime_error("Error: Invalid directive");
         }
     }
 }
@@ -187,7 +186,7 @@ void Config::exploreServerBlock(std::ifstream *ifs){
             case EMPTY:
                 break;
             case ERROR:
-                std::cerr << WARNING << std::endl;
+                throw std::runtime_error("Error: Invalid directive");
         }
     }
     server->confirmValues();
@@ -231,16 +230,17 @@ void Config::exploreLocationBlock(VirtualServer *server, std::ifstream *ifs, std
             case EMPTY:
                 break;
             case ERROR:
-                std::cerr << WARNING << std::endl;
+                throw std::runtime_error("Error: Invalid directive");
         }
     }
+    location->confirmValuesLocation();
     server->setLocation(location->getLocationPath(), location);
 }
 
 
 
-VirtualServer Config::getServer(const std::string serverName){
-    return *(servers_[serverName]);
+VirtualServer* Config::getServer(const std::string serverName){
+    return (servers_[serverName]);
 }
 //utils -----------------------------------------------------------------------
 

@@ -32,6 +32,70 @@ void HttpConnection::sendForbiddenPage(SOCKET sockfd)
         std::cout << "send!!!!!!" << std::endl;
 }
 
+void HttpConnection::sendNotAllowedPage(SOCKET sockfd)
+{
+    // 403.htmlの内容を取得
+    std::ifstream file("../documents/405.html");
+    if (!file.is_open()) {
+        perror("open error");
+        std::exit(EXIT_FAILURE);
+    }
+    std::string line;
+    std::string content;
+    while (std::getline(file, line)) {
+        content += line;
+        content += "\n";
+    }
+    file.close();
+
+    std::string response;
+    response = "HTTP/1.1 405 Method Not Allowed\n";
+    response += "Server: webserv42tokyo\n";
+    response += "Date: " + getGmtDate() + "\n"; 
+    response += "Content-Length: " + std::to_string(content.size()) + "\n";
+    response += "Connection: Keep-Alive\n";
+    response += "Content-Type: text/html\n";
+    response += "\n";
+    response += content;
+
+    if(send(sockfd, response.c_str(), response.length(), 0) < 0)
+        std::cerr << "Error: send() failed" << std::endl;
+    else
+        std::cout << "send!!!!!!" << std::endl;
+}
+
+void HttpConnection::requestEntityPage(SOCKET sockfd)
+{
+    // 403.htmlの内容を取得
+    std::ifstream file("../documents/413.html");
+    if (!file.is_open()) {
+        perror("open error");
+        std::exit(EXIT_FAILURE);
+    }
+    std::string line;
+    std::string content;
+    while (std::getline(file, line)) {
+        content += line;
+        content += "\n";
+    }
+    file.close();
+
+    std::string response;
+    response = "HTTP/1.1 413 Request Entity Too Large\n";
+    response += "Server: webserv42tokyo\n";
+    response += "Date: " + getGmtDate() + "\n"; 
+    response += "Content-Length: " + std::to_string(content.size()) + "\n";
+    response += "Connection: Keep-Alive\n";
+    response += "Content-Type: text/html\n";
+    response += "\n";
+    response += content;
+
+    if(send(sockfd, response.c_str(), response.length(), 0) < 0)
+        std::cerr << "Error: send() failed" << std::endl;
+    else
+        std::cout << "send!!!!!!" << std::endl;
+}
+
 void HttpConnection::sendNotImplementedPage(SOCKET sockfd)
 {
     // 501.htmlの内容を取得
@@ -79,7 +143,7 @@ void HttpConnection::executeCgi_postVersion(RequestParse& requestInfo, int pipe_
         std::cout << "Error: execve() failed" << std::endl;
 }
 
-void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd)
+void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server)
 {
     std::string directory = "../upload";
     // 一応、/upload/ディレクトリがちゃんと存在するか確認
@@ -88,6 +152,20 @@ void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd)
     {
         sendForbiddenPage(sockfd);
         return ;
+    }
+
+    // もしclient_max_body_sizeが設定されていた場合
+    if (server->serverSetting.find("client_max_body_size") != server->serverSetting.end())
+    {
+        std::string request_body = requestInfo.getBody();
+        std::istringstream iss(server->serverSetting["client_max_body_size"]);
+        unsigned long number;
+        iss >> number;
+        if (request_body.size() > number)
+        {
+            requestEntityPage(sockfd);
+            return ;
+        }
     }
 
     int pipe_c2p[2];
@@ -99,7 +177,7 @@ void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd)
     createResponseFromCgiOutput(pid, sockfd, pipe_c2p);
 }
 
-void HttpConnection::deleteProcess(RequestParse& requestInfo, SOCKET sockfd)
+void HttpConnection::deleteProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server)
 {
     std::string file_path = ".." + requestInfo.getPath();
 
@@ -107,7 +185,7 @@ void HttpConnection::deleteProcess(RequestParse& requestInfo, SOCKET sockfd)
     // 削除対象のファイル,ディレクトリの存在をチェック
     if (stat(file_path.c_str(), &info) != 0)
     {
-        sendDefaultErrorPage(sockfd);//404エラー
+        sendDefaultErrorPage(sockfd, server);//404エラー
         return ;
     }
     // 削除対象がディレクトリであるか確認

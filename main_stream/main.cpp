@@ -12,9 +12,9 @@ int main(int argc, char **argv){
     }
     try{
         Config *conf = Config::getInstance(argv[1]);
-        // std::set<int> tcpSocketSet = conf->getTcpSockets();
-        // HttpConnection* connection = HttpConnection::getInstance(tcpSocketSet);
-        // connection->startEventLoop(conf, tcpSocketSet);
+        std::set<int> tcpSocketSet = conf->getTcpSockets();
+        HttpConnection* connection = HttpConnection::getInstance(tcpSocketSet);
+        connection->startEventLoop(conf, tcpSocketSet);
 
 
 
@@ -49,7 +49,7 @@ int main(int argc, char **argv){
                 locationMap locationSetting = it3->second->locationSetting;
                 for (locationMap::const_iterator it4 = locationSetting.begin(); it4 != locationSetting.end(); ++it4)
                 {
-                    std::cout << it4->first << ":" << it4->second << std::endl;
+                    std::cout << it4->first << "->" << it4->second << std::endl;
                 } // VirtualServerのlocationSettingを出力->mapだから出力結果はアルファベット順？
                 // aaa bbb;などのパターンでは、格納されずWARNIGWARNIG...と出力されてはいるが継続->プログラムを終了させるべき？
 

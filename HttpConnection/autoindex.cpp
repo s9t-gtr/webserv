@@ -98,20 +98,20 @@ static std::string getIndexList(std::string path, std::string path_fixed)
 }
 
 // AutoindexPageを作成して返す関数(autoindexディレクトリのexample.htmlを参考に作成した)
-void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd)
+void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location)
 {
     std::string path_fixed = ".." + requestInfo.getPath();
 
     struct stat info;
     if (stat(path_fixed.c_str(), &info) != 0) {
         // パスにアクセスできない場合
-        return sendDefaultErrorPage(sockfd);
+        return sendDefaultErrorPage(sockfd, server);
     } else if (info.st_mode & S_IFDIR) {
         // パスがディレクトリである場合
         ;
     } else {
         // パスがディレクトリではない場合(ファイルの時)
-        return sendStaticPage(requestInfo, sockfd);
+        return sendStaticPage(requestInfo, sockfd, server, location);
     }
 
     std::string content;

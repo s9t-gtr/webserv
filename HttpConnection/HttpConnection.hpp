@@ -44,16 +44,20 @@ class HttpConnection{
         void executeCgi(Config *conf, RequestParse& requestInfo, int *pipe_c2p);
         void createResponseFromCgiOutput(pid_t pid, SOCKET sockfd, int pipe_c2p[2]);
 
-        void sendDefaultErrorPage(SOCKET sockfd);
-        void sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd);
+        void sendDefaultErrorPage(SOCKET sockfd, VirtualServer* server);
+        void sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location);
         std::string getGmtDate();
-        void sendStaticPage(RequestParse& requestInfo, SOCKET sockfd);
-        void sendRedirectPage(SOCKET sockfd);
-        void postProcess(RequestParse& requestInfo, SOCKET sockfd);
+        void sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location);
+        void sendRedirectPage(SOCKET sockfd, Location* location);
+        void postProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server);
         void executeCgi_postVersion(RequestParse& requestInfo, int pipe_c2p[2]);
         void sendForbiddenPage(SOCKET sockfd);
-        void deleteProcess(RequestParse& requestInfo, SOCKET sockfd);
+        void deleteProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server);
         void sendNotImplementedPage(SOCKET sockfd);
+        void sendNotAllowedPage(SOCKET sockfd);
+        void requestEntityPage(SOCKET sockfd);
+        std::string selectLocationSetting(std::map<std::string, Location*> &locations, std::string request_path);
+        bool isAllowedMethod(Location* location, std::string method);
 };
 
 #endif

@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <map>
+#include <sstream>
 #include "Location.hpp"
 
 typedef std::map<std::string, std::string> serverMap;

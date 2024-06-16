@@ -12,7 +12,7 @@ std::string HttpConnection::getGmtDate()
 }
 
 // サーバーからのレスポンスとしてリダイレクトページを送る関数
-void HttpConnection::sendRedirectPage(SOCKET sockfd)
+void HttpConnection::sendRedirectPage(SOCKET sockfd, Location* location)
 {
     std::string response;
     response = "HTTP/1.1 301 Moved Permanently\n";
@@ -20,7 +20,7 @@ void HttpConnection::sendRedirectPage(SOCKET sockfd)
     response += "Content-Length: 0\n";
     response += "Date: " + getGmtDate() + "\n"; 
     response += "Server: webserv/1.0.0\n";
-    response += "Location: http://google.com\n";
+    response += "Location: " + location->locationSetting["return"] + "\n";
     response += "\n";//ヘッダーとボディを分けるために、ボディが空でも必要
 
     if(send(sockfd, response.c_str(), response.length(), 0) < 0)
@@ -30,13 +30,16 @@ void HttpConnection::sendRedirectPage(SOCKET sockfd)
 }
 
 // サーバーからのレスポンスとしてデフォルトのエラーページを送る関数
-void HttpConnection::sendDefaultErrorPage(SOCKET sockfd)
+void HttpConnection::sendDefaultErrorPage(SOCKET sockfd, VirtualServer* server)
 {
+    std::string error_page_path = server->serverSetting["error_page"];
     // デフォルトのエラーページの内容を取得
-    std::ifstream file("../documents/404.html");
+    std::ifstream file(error_page_path);
     if (!file.is_open()) {
-        perror("open error");
-        std::exit(EXIT_FAILURE);
+        //ファイルパスが無効ならデフォルトを設定
+        error_page_path = "../documents/404_default.html";
+        file.close();  // 既存のファイルストリームを閉じる
+        file.open(error_page_path);  // 新しいファイルを開く
     }
     std::string line;
     std::string content;
@@ -63,31 +66,42 @@ void HttpConnection::sendDefaultErrorPage(SOCKET sockfd)
 }
 
 // サーバーからのレスポンスとして静的ファイルを送る関数
-void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd)
+void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location)
 {
-    std::string file_path = ".." + requestInfo.getPath();
-
-    // もしパスが指定されていない、または、パスが/documents/ディレクトリのときは、デフォルトのindex.htmlページを送る
-    if (requestInfo.getPath() == "/" || requestInfo.getPath() == "/documents/")
+    std::string file_path = location->locationSetting["root"] + requestInfo.getPath();
+    // std::cout << "========" << file_path << "========" << std::endl; //デバッグ
+    // もしパスが指定されていないときは、デフォルトのindex.htmlページを送る
+    if (requestInfo.getPath() == "/")
         file_path = "../documents/index.html";
 
     struct stat info;
     // 対象のファイル,ディレクトリの存在をチェックしつつ、infoに情報を読み込む
     if (stat(file_path.c_str(), &info) != 0)
     {
-        sendDefaultErrorPage(sockfd);//404エラー
+        sendDefaultErrorPage(sockfd, server);//404エラー
         return ;
     }
-    // 削除対象がディレクトリであるか確認
+    // 対象がディレクトリであるか確認
     if (S_ISDIR(info.st_mode))
     {
-        sendForbiddenPage(sockfd);//403エラー
-        return ;
+        // indexが設定されていたらそのファイルを出す
+        if (location->locationSetting["index"] != "none")
+            file_path = location->locationSetting["index"];
+        else if (location->locationSetting["autoindex"] == "on")
+        {
+            sendAutoindexPage(requestInfo, sockfd, server, location);
+            return ;
+        }
+        else
+        {
+            sendForbiddenPage(sockfd);//403エラー
+            return ;
+        }
     }
 
     std::ifstream file(file_path);
     if (!file.is_open()) {
-        sendDefaultErrorPage(sockfd);//404エラー <- std::exitのほうがいい？
+        sendDefaultErrorPage(sockfd, server);//404エラー <- std::exitのほうがいい？
         return ;
     }
 
