@@ -264,7 +264,7 @@ void HttpConnection::createResponseFromCgiOutput(pid_t pid, SOCKET sockfd, int p
     }
     if(byte > 0){
         res_buf[byte] = '\0';
-        int status = send(sockfd, response.c_str(), response.length(), 0);
+        int status = send(sockfd, &res_buf, byte, 0);
         if (status == 0){
             delete events[sockfd];
             close(sockfd); //返り値が0のときは接続の失敗
