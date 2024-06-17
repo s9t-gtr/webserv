@@ -143,8 +143,16 @@ void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd,
     response += "\n";
     response += content;
     // std::cout << response << std::endl;
-    if(send(sockfd, response.c_str(), response.length(), 0) < 0)
-        std::cerr << "Error: send() failed" << std::endl;
-    // else
-    //     std::cout << "send!!!!!!" << std::endl;
+    int status = send(sockfd, response.c_str(), response.length(), 0);
+    if (status == 0){
+        delete events[sockfd];
+        close(sockfd); //返り値が0のときは接続の失敗
+    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
+    else 
+    {
+        perror("send error"); //返り値が-1のときはシステムコールの失敗
+        delete events[sockfd];
+        close(sockfd);
+        std::exit(EXIT_FAILURE);
+    }
 }

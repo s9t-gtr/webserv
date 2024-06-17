@@ -23,10 +23,18 @@ void HttpConnection::sendRedirectPage(SOCKET sockfd, Location* location)
     response += "Location: " + location->locationSetting["return"] + "\n";
     response += "\n";//ヘッダーとボディを分けるために、ボディが空でも必要
 
-    if(send(sockfd, response.c_str(), response.length(), 0) < 0)
-        std::cerr << "Error: send() failed" << std::endl;
-    // else
-    //     std::cout << "send!!!!!!" << std::endl;
+    int status = send(sockfd, response.c_str(), response.length(), 0);
+    if (status == 0){
+        delete events[sockfd];
+        close(sockfd); //返り値が0のときは接続の失敗
+    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
+    else 
+    {
+        perror("send error"); //返り値が-1のときはシステムコールの失敗
+        delete events[sockfd];
+        close(sockfd);
+        std::exit(EXIT_FAILURE);
+    }
 }
 
 // サーバーからのレスポンスとしてデフォルトのエラーページを送る関数
@@ -59,10 +67,18 @@ void HttpConnection::sendDefaultErrorPage(SOCKET sockfd, VirtualServer* server)
     response += "\n";
     response += content;
 
-    if(send(sockfd, response.c_str(), response.length(), 0) < 0)
-        std::cerr << "Error: send() failed" << std::endl;
-    // else
-    //     std::cout << "send!!!!!!" << std::endl;
+    int status = send(sockfd, response.c_str(), response.length(), 0);
+    if (status == 0){
+        delete events[sockfd];
+        close(sockfd); //返り値が0のときは接続の失敗
+    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
+    else 
+    {
+        perror("send error"); //返り値が-1のときはシステムコールの失敗
+        delete events[sockfd];
+        close(sockfd);
+        std::exit(EXIT_FAILURE);
+    }
 }
 
 // サーバーからのレスポンスとして静的ファイルを送る関数
@@ -123,8 +139,16 @@ void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, Vi
     response += "\n";
     response += content;
 
-    if(send(sockfd, response.c_str(), response.length(), 0) < 0)
-        std::cerr << "Error: send() failed" << std::endl;
-    // else
-    //     std::cout << "send!!!!!!" << std::endl;
+    int status = send(sockfd, response.c_str(), response.length(), 0);
+    if (status == 0){
+        delete events[sockfd];
+        close(sockfd); //返り値が0のときは接続の失敗
+    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
+    else 
+    {
+        perror("send error"); //返り値が-1のときはシステムコールの失敗
+        delete events[sockfd];
+        close(sockfd);
+        std::exit(EXIT_FAILURE);
+    }
 }

@@ -250,11 +250,31 @@ void HttpConnection::createResponseFromCgiOutput(pid_t pid, SOCKET sockfd, int p
     waitpid(pid, NULL, 0);
     close(pipe_c2p[W]);
     ssize_t byte = read(pipe_c2p[R], &res_buf, MAX_BUF_LENGTH);
+    if (byte == 0)
+    {
+        delete events[sockfd];
+        close(sockfd);
+    }
+    if (byte == -1)
+    {
+        perror("read error"); //返り値が-1のときはシステムコールの失敗
+        delete events[sockfd];
+        close(sockfd);
+        std::exit(EXIT_FAILURE);
+    }
     if(byte > 0){
         res_buf[byte] = '\0';
-        if(send(sockfd, &res_buf, byte, 0) < 0)
-            std::cerr << "Error: send() failed" << std::endl;
-        // else
-        //     std::cout << "send!!!!!!" << std::endl;
+        int status = send(sockfd, response.c_str(), response.length(), 0);
+        if (status == 0){
+            delete events[sockfd];
+            close(sockfd); //返り値が0のときは接続の失敗
+        } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
+        else 
+        {
+            perror("send error"); //返り値が-1のときはシステムコールの失敗
+            delete events[sockfd];
+            close(sockfd);
+            std::exit(EXIT_FAILURE);
+        }
     }
 }
