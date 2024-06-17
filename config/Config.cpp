@@ -57,6 +57,7 @@ SOCKET tcpListen(std::string hostname, std::string port){
         hints.ai_socktype = SOCK_STREAM; // TCPソケット
         hints.ai_flags = AI_PASSIVE;
         // std::cout << hostname << " : " << port << std::endl;
+        (void)hostname;
 
         int isError = getaddrinfo(NULL, port.c_str(), &hints, &result);//名前解決不可のため、第一引数はNULLに設定
         if(isError != 0){
