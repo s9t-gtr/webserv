@@ -82,7 +82,7 @@ void HttpConnection::eventExecute(Config *conf, SOCKET sockfd, socketSet tcpSock
 }
 
 void HttpConnection::establishTcpConnection(SOCKET sockfd){
-    std::cout << "TCP CONNECTION ESTABLISHED"<< std::endl;
+    // std::cout << "TCP CONNECTION ESTABLISHED"<< std::endl;
 
     struct sockaddr_storage client_sa;  // sockaddr_in 型ではない。 
     socklen_t len = sizeof(client_sa);   
