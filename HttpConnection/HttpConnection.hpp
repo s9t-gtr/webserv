@@ -7,6 +7,8 @@
 #include <sstream>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <signal.h>
+#include <sys/wait.h>
 
 typedef struct timespec timespec;
 typedef std::map<int, struct kevent*> keventMap;
@@ -58,6 +60,7 @@ class HttpConnection{
         void requestEntityPage(SOCKET sockfd);
         std::string selectLocationSetting(std::map<std::string, Location*> &locations, std::string request_path);
         bool isAllowedMethod(Location* location, std::string method);
+        void sendTimeoutPage(SOCKET sockfd);
 };
 
 #endif

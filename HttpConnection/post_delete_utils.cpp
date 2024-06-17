@@ -128,6 +128,38 @@ void HttpConnection::sendNotImplementedPage(SOCKET sockfd)
         std::cout << "send!!!!!!" << std::endl;
 }
 
+void HttpConnection::sendTimeoutPage(SOCKET sockfd)
+{
+    // 504.htmlの内容を取得
+    std::ifstream file("../documents/504.html");
+    if (!file.is_open()) {
+        perror("open error");
+        std::exit(EXIT_FAILURE);
+    }
+    std::string line;
+    std::string content;
+    while (std::getline(file, line)) {
+        content += line;
+        content += "\n";
+    }
+    file.close();
+
+    std::string response;
+    response = "HTTP/1.1 504 Gateway Timeout\n";
+    response += "Server: webserv42tokyo\n";
+    response += "Date: " + getGmtDate() + "\n"; 
+    response += "Content-Length: " + std::to_string(content.size()) + "\n";
+    response += "Connection: Keep-Alive\n";
+    response += "Content-Type: text/html\n";
+    response += "\n";
+    response += content;
+
+    if(send(sockfd, response.c_str(), response.length(), 0) < 0)
+        std::cerr << "Error: send() failed" << std::endl;
+    else
+        std::cout << "send!!!!!!" << std::endl;
+}
+
 // GETのcgi関数と違うのはPOSTメソッドで届いたクライアントからのリクエストボディをexecveの引数に渡すところ
 void HttpConnection::executeCgi_postVersion(RequestParse& requestInfo, int pipe_c2p[2])
 {

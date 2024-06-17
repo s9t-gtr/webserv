@@ -158,6 +158,14 @@ bool HttpConnection::isAllowedMethod(Location* location, std::string method)
     return true;
 }
 
+void handleTimeout(int sig)
+{
+    (void)sig;
+    std::cerr << "Error: CGI script execution timed out" << std::endl;
+    // 必要ならば他のクリーンアップ処理をここに追加
+    std::exit(1);
+}
+
 void HttpConnection::sendResponse(Config *conf, RequestParse& requestInfo, SOCKET sockfd){
     //今回指定されたバーチャルサーバーの設定情報を使いたいのでインスタンス化
     VirtualServer* server = conf->getServer(requestInfo.getHostName());
@@ -233,6 +241,10 @@ void HttpConnection::executeCgi(Config *conf, RequestParse& requestInfo, int pip
     close(pipe_c2p[R]);
     dup2(pipe_c2p[W],1);
     close(pipe_c2p[W]);
+
+    signal(SIGALRM, handleTimeout);
+    alarm(5);
+
     extern char** environ;
     VirtualServer* server = conf->getServer(requestInfo.getHostName());
     std::string cgiPath = server->getCgiPath();
@@ -243,8 +255,21 @@ void HttpConnection::executeCgi(Config *conf, RequestParse& requestInfo, int pip
 
 void HttpConnection::createResponseFromCgiOutput(pid_t pid, SOCKET sockfd, int pipe_c2p[2]){
     char res_buf[MAX_BUF_LENGTH];
-    waitpid(pid, NULL, 0);
+    int status;
+    waitpid(pid, &status, 0);
     close(pipe_c2p[W]);
+
+    int exit_status;
+	if (WIFSIGNALED(status) != 0)
+		exit_status = WTERMSIG(status);
+	else
+		exit_status = WEXITSTATUS(status);
+    if (exit_status == 14)
+    {
+        sendTimeoutPage(sockfd);
+        return ;
+    }
+
     ssize_t byte = read(pipe_c2p[R], &res_buf, MAX_BUF_LENGTH);
     if(byte > 0){
         res_buf[byte] = '\0';

@@ -8,6 +8,13 @@ int main(void)
   /* 出力データを文字列としてためておくための変数 */
   string strOutData;
 
+  while (1)
+  {
+    int a;
+    (void)a;
+  }
+  
+
   /* httpヘッダ */
   /* HTML出力であることを出力 */
 strOutData = "HTTP/1.1 200 OK\n";
