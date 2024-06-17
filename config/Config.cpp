@@ -25,8 +25,8 @@ Config* Config::getInstance(std::string configPath){
     try{
         inst = new Config(configPath);
         readConfig(inst);
-        std::cout << ".conf file completed" << std::endl;
-        std::cout << "----------------------------------------------" << std::endl;//出力結果をみやすく
+        // std::cout << ".conf file completed" << std::endl;
+        // std::cout << "----------------------------------------------" << std::endl;//出力結果をみやすく
     }catch(std::bad_alloc& e){
         std::cerr<< "Error: Failed new Config() " << std::endl;
         std::exit(EXIT_FAILURE); 
@@ -56,14 +56,14 @@ SOCKET tcpListen(std::string hostname, std::string port){
         hints.ai_family = AF_INET6;
         hints.ai_socktype = SOCK_STREAM; // TCPソケット
         hints.ai_flags = AI_PASSIVE;
-        std::cout << hostname << " : " << port << std::endl;
+        // std::cout << hostname << " : " << port << std::endl;
 
         int isError = getaddrinfo(NULL, port.c_str(), &hints, &result);//名前解決不可のため、第一引数はNULLに設定
         if(isError != 0){
             std::cerr << gai_strerror(isError) << std::endl;
             throw std::runtime_error("Error: getaddrinfo(): failed");
         }
-        std::cout << "create socket" << std::endl;; 
+        // std::cout << "create socket" << std::endl;; 
         struct addrinfo *ai = result;
         sockfd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
         if(sockfd == INVALID_SOCKET){
@@ -78,7 +78,7 @@ SOCKET tcpListen(std::string hostname, std::string port){
             close(sockfd);
             throw std::runtime_error("Error: setsockopt(): failed");
         }
-        printf("set SO_REUSEADDR\n");
+        // printf("set SO_REUSEADDR\n");
         if(bind(sockfd, ai->ai_addr, ai->ai_addrlen) < 0){
             std::cerr << "bind(): " << strerror(errno) << std::endl;
             freeaddrinfo(result);
@@ -97,9 +97,9 @@ SOCKET tcpListen(std::string hostname, std::string port){
             close(sockfd);
             throw std::runtime_error("Error: listen(): failed"); 
         }
-        std::cout << "sockfd = " << sockfd << std::endl;
-        printf("Listen succeeded\n"); 
-        std::cout << "----------------------------------------------" << std::endl;
+        // std::cout << "sockfd = " << sockfd << std::endl;
+        // printf("Listen succeeded\n"); 
+        // std::cout << "----------------------------------------------" << std::endl;
         return sockfd;
 }
 

@@ -28,8 +28,8 @@ void HttpConnection::sendForbiddenPage(SOCKET sockfd)
 
     if(send(sockfd, response.c_str(), response.length(), 0) < 0)
         std::cerr << "Error: send() failed" << std::endl;
-    else
-        std::cout << "send!!!!!!" << std::endl;
+    // else
+    //     std::cout << "send!!!!!!" << std::endl;
 }
 
 void HttpConnection::sendNotAllowedPage(SOCKET sockfd)
@@ -60,8 +60,8 @@ void HttpConnection::sendNotAllowedPage(SOCKET sockfd)
 
     if(send(sockfd, response.c_str(), response.length(), 0) < 0)
         std::cerr << "Error: send() failed" << std::endl;
-    else
-        std::cout << "send!!!!!!" << std::endl;
+    // else
+    //     std::cout << "send!!!!!!" << std::endl;
 }
 
 void HttpConnection::requestEntityPage(SOCKET sockfd)
@@ -92,8 +92,8 @@ void HttpConnection::requestEntityPage(SOCKET sockfd)
 
     if(send(sockfd, response.c_str(), response.length(), 0) < 0)
         std::cerr << "Error: send() failed" << std::endl;
-    else
-        std::cout << "send!!!!!!" << std::endl;
+    // else
+    //     std::cout << "send!!!!!!" << std::endl;
 }
 
 void HttpConnection::sendNotImplementedPage(SOCKET sockfd)
@@ -124,8 +124,8 @@ void HttpConnection::sendNotImplementedPage(SOCKET sockfd)
 
     if(send(sockfd, response.c_str(), response.length(), 0) < 0)
         std::cerr << "Error: send() failed" << std::endl;
-    else
-        std::cout << "send!!!!!!" << std::endl;
+    // else
+    //     std::cout << "send!!!!!!" << std::endl;
 }
 
 // GETのcgi関数と違うのはPOSTメソッドで届いたクライアントからのリクエストボディをexecveの引数に渡すところ
@@ -211,6 +211,6 @@ void HttpConnection::deleteProcess(RequestParse& requestInfo, SOCKET sockfd, Vir
 
     if(send(sockfd, response.c_str(), response.length(), 0) < 0)
         std::cerr << "Error: send() failed" << std::endl;
-    else
-        std::cout << "send!!!!!!" << std::endl;
+    // else
+    //     std::cout << "send!!!!!!" << std::endl;
 }

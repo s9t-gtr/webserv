@@ -96,8 +96,8 @@ void HttpConnection::establishTcpConnection(SOCKET sockfd){
     //----------acceptのエラー処理追加------------
     createNewEvent(newSocket);
     eventRegister(newSocket);
-    std::cout << "event socket = " << sockfd << std::endl;
-    std::cout << "new socket = " << newSocket << std::endl;
+    // std::cout << "event socket = " << sockfd << std::endl;
+    // std::cout << "new socket = " << newSocket << std::endl;
 }
 
 void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
@@ -254,7 +254,7 @@ void HttpConnection::createResponseFromCgiOutput(pid_t pid, SOCKET sockfd, int p
         res_buf[byte] = '\0';
         if(send(sockfd, &res_buf, byte, 0) < 0)
             std::cerr << "Error: send() failed" << std::endl;
-        else
-            std::cout << "send!!!!!!" << std::endl;
+        // else
+        //     std::cout << "send!!!!!!" << std::endl;
     }
 }

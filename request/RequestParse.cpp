@@ -67,7 +67,6 @@ void RequestParse::setHeaders(strVec linesVec, strVec::iterator& it){
 }
 
 void RequestParse::setBody(strVec  linesVec, strVec::iterator itFromBody) {
-    std::cout << (*itFromBody).size() << std::endl;
     if((*itFromBody).size() == 0 || itFromBody == linesVec.end()){
         body = "";
         return;

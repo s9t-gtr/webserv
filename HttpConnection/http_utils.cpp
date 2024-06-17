@@ -25,8 +25,8 @@ void HttpConnection::sendRedirectPage(SOCKET sockfd, Location* location)
 
     if(send(sockfd, response.c_str(), response.length(), 0) < 0)
         std::cerr << "Error: send() failed" << std::endl;
-    else
-        std::cout << "send!!!!!!" << std::endl;
+    // else
+    //     std::cout << "send!!!!!!" << std::endl;
 }
 
 // サーバーからのレスポンスとしてデフォルトのエラーページを送る関数
@@ -61,8 +61,8 @@ void HttpConnection::sendDefaultErrorPage(SOCKET sockfd, VirtualServer* server)
 
     if(send(sockfd, response.c_str(), response.length(), 0) < 0)
         std::cerr << "Error: send() failed" << std::endl;
-    else
-        std::cout << "send!!!!!!" << std::endl;
+    // else
+    //     std::cout << "send!!!!!!" << std::endl;
 }
 
 // サーバーからのレスポンスとして静的ファイルを送る関数
@@ -125,6 +125,6 @@ void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, Vi
 
     if(send(sockfd, response.c_str(), response.length(), 0) < 0)
         std::cerr << "Error: send() failed" << std::endl;
-    else
-        std::cout << "send!!!!!!" << std::endl;
+    // else
+    //     std::cout << "send!!!!!!" << std::endl;
 }

@@ -145,6 +145,6 @@ void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd,
     // std::cout << response << std::endl;
     if(send(sockfd, response.c_str(), response.length(), 0) < 0)
         std::cerr << "Error: send() failed" << std::endl;
-    else
-        std::cout << "send!!!!!!" << std::endl;
+    // else
+    //     std::cout << "send!!!!!!" << std::endl;
 }
