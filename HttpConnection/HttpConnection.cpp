@@ -67,6 +67,7 @@ void HttpConnection::startEventLoop(Config *conf, socketSet tcpSockets){
         //---------size_tをssize_tに修正-----------//
         ssize_t nevent = kevent(kq, NULL, 0, eventlist, sizeof(*eventlist), NULL);
         for(ssize_t i = 0; i<nevent;i++){
+            usleep(1100);
             eventExecute(conf, eventlist[i].ident, tcpSockets);
         }
         //---------size_tをssize_tに修正-----------//
@@ -114,11 +115,14 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
     }   
 
     //----------recvのエラー処理追加------------
-    else if (bytesReceived == 0) //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
+    else if (bytesReceived == 0){
+        delete events[sockfd];
         close(sockfd); //返り値が0のときは接続の失敗
+    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
     else 
     {
         perror("recv error"); //返り値が-1のときはシステムコールの失敗
+        delete events[sockfd];
         close(sockfd);
         std::exit(EXIT_FAILURE);
     }
