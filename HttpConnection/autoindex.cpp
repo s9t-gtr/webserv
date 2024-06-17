@@ -148,7 +148,7 @@ void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd,
         delete events[sockfd];
         close(sockfd); //返り値が0のときは接続の失敗
     } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-    else 
+    if (status < 0)
     {
         perror("send error"); //返り値が-1のときはシステムコールの失敗
         delete events[sockfd];
