@@ -67,7 +67,6 @@ void RequestParse::setHeaders(strVec linesVec, strVec::iterator& it){
 }
 
 void RequestParse::setBody(strVec  linesVec, strVec::iterator itFromBody) {
-    std::cout << (*itFromBody).size() << std::endl;
     if((*itFromBody).size() == 0 || itFromBody == linesVec.end()){
         body = "";
         return;
@@ -193,7 +192,8 @@ std::string RequestParse::getHostName(){
     std::string directive = getHeader("Host");
     if(directive != ""){
         strVec spDirective = split(directive, ':');
-        return spDirective[0];
+
+        return spDirective.size() != 2 ? "localhost" : spDirective[0];
     }
     return "";
 }

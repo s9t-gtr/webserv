@@ -22,6 +22,12 @@ class Location{
         void setSetting(std::string directiveName, std::string directiveContent);
         std::string getLocationPath();
         locationMap::iterator getItEnd();
+        void confirmValuesLocation();
+        void confirmIndex();
+        void confirmRoot();
+        void confirmAllowMethod();
+        void confirmAutoindex();
+        void confirmReturn();
 };
 
 #endif

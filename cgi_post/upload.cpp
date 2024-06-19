@@ -27,7 +27,7 @@ static std::string uploadFile(std::string upload_dir, std::string request_body)
     std::ofstream file(file_path.c_str());
     if (!file.is_open()) {
         perror("open error");
-        std::exit(EXIT_FAILURE);
+        // std::exit(EXIT_FAILURE);
     }
 
     file << request_body;
