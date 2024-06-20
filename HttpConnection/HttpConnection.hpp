@@ -10,6 +10,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <sstream>
+#include <sys/event.h>
 
 struct tmpInfo{
     enum Status{
@@ -27,7 +28,7 @@ typedef std::map<int, tmpInfo> tmpInfoMap;
 
 #define W 1
 #define R 0
-#define MAX_BUF_LENGTH 11
+#define MAX_BUF_LENGTH 64
 #define UPLOAD "/upload/"
 
 class HttpConnection{

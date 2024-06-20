@@ -53,18 +53,12 @@ void HttpConnection::createNewEvent(SOCKET targetSocket){
 void HttpConnection::createConnectEvent(SOCKET targetSocket){
     events[targetSocket] = new struct kevent;
     EV_SET(events[targetSocket], targetSocket, EVFILT_READ, EV_ADD , 0, 0, NULL);
-    if(kevent(kq, events[targetSocket], 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
-                perror("kevent"); // kevent: エラーメッセージ
-                printf("errno = %d (%s)\n", errno, strerror(errno)); 
-                throw std::runtime_error("Error: kevent() failed()");
-            }
     EV_SET(events[targetSocket], targetSocket, EVFILT_WRITE, EV_ADD , 0, 0, NULL);
     if(kevent(kq, events[targetSocket], 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
-                perror("kevent"); // kevent: エラーメッセージ
-                printf("errno = %d (%s)\n", errno, strerror(errno)); 
-                throw std::runtime_error("Error: kevent() failed()");
-            }
-    // EV_SET(events[targetSocket], targetSocket, EVFILT_WRITE, EV_ENABLE, 0, 0, NULL);
+        perror("kevent"); // kevent: エラーメッセージ
+        printf("errno = %d (%s)\n", errno, strerror(errno)); 
+        throw std::runtime_error("Error: kevent() failed()");
+    }
 }
 
 void HttpConnection::eventRegister(SOCKET fd){
@@ -179,9 +173,9 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
         int bytesReceived = recv(sockfd, &buf, MAX_BUF_LENGTH, MSG_DONTWAIT);
         std::cout << "bytesRecieved: " << bytesReceived << std::endl;
         if(MAX_BUF_LENGTH > bytesReceived && bytesReceived > 0){
-            // std::cout << "==========EVENT==========" << std::endl;
-            // std::cout << "event socket = " << sockfd << std::endl;
-            // std::cout << "HTTP REQUEST"<< std::endl;
+            std::cout << "==========EVENT RECV==========" << std::endl;
+            std::cout << "event socket = " << sockfd << std::endl;
+            std::cout << "HTTP REQUEST"<< std::endl;
             std::string request;
             if(tmpInfos.find(sockfd) != tmpInfos.end()){
                 request = tmpInfos[sockfd].tmpBuffer;
@@ -192,8 +186,8 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
             // RequestParse requestInfo(request);
             // sendResponse(conf, requestInfo, sockfd);
             tmpInfos[sockfd].status = tmpInfo::Send;
-            EV_SET(events[sockfd], sockfd, EVFILT_READ, EV_DISABLE, 0, 0, NULL);
             EV_SET(events[sockfd], sockfd, EVFILT_WRITE, EV_ENABLE, 0, 0, NULL);
+            EV_SET(events[sockfd], sockfd, EVFILT_READ, EV_DISABLE, 0, 0, NULL);
             if(kevent(kq, events[sockfd], 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
                 perror("kevent"); // kevent: エラーメッセージ
                 printf("errno = %d (%s)\n", errno, strerror(errno)); 
@@ -203,6 +197,8 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
         }   
         //----------recvのエラー処理追加------------
         else if(bytesReceived == MAX_BUF_LENGTH){
+            std::cout << "==========EVENT RECV==========" << std::endl;
+            std::cout << "event socket = " << sockfd << std::endl;
             tmpInfos[sockfd].tmpBuffer += std::string(buf, buf+bytesReceived);
         // std::cerr << tmpInfos[sockfd].tmpBuffer << std::endl;
             if(checkCompleteRecieved(tmpInfos[sockfd])){
@@ -210,7 +206,7 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
                 // sendResponse(conf, requestInfo, sockfd);
                 tmpInfos[sockfd].status = tmpInfo::Send;
                 EV_SET(events[sockfd], sockfd, EVFILT_WRITE, EV_ENABLE, 0, 0, NULL);
-                // // EV_SET(events[sockfd], sockfd, EVFILT_READ, EV_DISABLE, 0, 0, NULL);
+                EV_SET(events[sockfd], sockfd, EVFILT_READ, EV_DISABLE, 0, 0, NULL);
                 if(kevent(kq, events[sockfd], 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
                     perror("kevent"); // kevent: エラーメッセージ
                     printf("errno = %d (%s)\n", errno, strerror(errno)); 
@@ -223,7 +219,6 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
         else if (bytesReceived == 0)
         {
             perror("recv error");
-
             tmpInfos.erase(sockfd);
             delete events[sockfd];
             close(sockfd); //返り値が0のときは接続の失敗
@@ -234,12 +229,14 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
             tmpInfos.erase(sockfd);
             delete events[sockfd];
             close(sockfd);
-            
+            std::cout << "sockfd = " << sockfd <<": closeしちゃっった" << std::endl;;
         }
         //----------recvのエラー処理追加------------
     }
     else if(tmpInfos[sockfd].status == tmpInfo::Send){
-        std::cerr <<"result :\n" <<  tmpInfos[sockfd].tmpBuffer << std::endl;
+            std::cout << "==========EVENT SEND==========" << std::endl;
+            std::cout << "event socket = " << sockfd << std::endl;
+
         RequestParse requestInfo(tmpInfos[sockfd].tmpBuffer);
         sendResponse(conf, requestInfo, sockfd);
         EV_SET(events[sockfd], sockfd, EVFILT_WRITE, EV_DISABLE, 0, 0, NULL);
