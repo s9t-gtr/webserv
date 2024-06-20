@@ -9,19 +9,32 @@
 #include <sys/stat.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <sstream>
+
+struct tmpInfo{
+    enum Status{
+        Recv,
+        Send
+    };
+    Status status;
+    std::string tmpBuffer;
+    std::string::size_type content_length;
+};
 
 typedef struct timespec timespec;
 typedef std::map<int, struct kevent*> keventMap;
+typedef std::map<int, tmpInfo> tmpInfoMap;
 
 #define W 1
 #define R 0
-#define MAX_BUF_LENGTH 4096
+#define MAX_BUF_LENGTH 11
 #define UPLOAD "/upload/"
 
 class HttpConnection{
     private:
         static int kq;
         static keventMap events;
+        static tmpInfoMap tmpInfos;
         static struct kevent *eventlist;
         static timespec timeSpec;
     private:
@@ -42,6 +55,7 @@ class HttpConnection{
         static void eventRegister(SOCKET fd);
         void eventExecute(Config *conf, SOCKET sockefd, socketSet tcpSockets);
         void establishTcpConnection(SOCKET sockfd);
+        // bool isExistBuffer(SOCKET sockfd);
         void requestHandler(Config *conf, SOCKET sockfd);
         void sendResponse(Config *conf, RequestParse& requestInfo, SOCKET sockfd);
         void executeCgi(Config *conf, RequestParse& requestInfo, int *pipe_c2p);
@@ -63,6 +77,11 @@ class HttpConnection{
         bool isAllowedMethod(Location* location, std::string method);
         void sendTimeoutPage(SOCKET sockfd);
         void sendInternalErrorPage(SOCKET sockfd);
+
+        bool isReadNewLine(std::string tmpBuffer);
+        bool bodyConfirm(tmpInfo info);
+        bool checkCompleteRecieved(tmpInfo info);
+        void createConnectEvent(SOCKET targetSocket);
 };
 
 #endif
