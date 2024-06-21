@@ -72,17 +72,10 @@ void HttpConnection::deleteZombie(){
 
 void HttpConnection::startEventLoop(Config *conf, socketSet tcpSockets){
     while(1){
-<<<<<<< HEAD
-        deleteZombie();
-        size_t nevent = kevent(kq, NULL, 0, eventlist, sizeof(*eventlist), NULL);
-        for(size_t i = 0; i<nevent;i++){
-            eventConnect(conf, eventlist[i].ident, tcpSockets);
-=======
         //---------size_tをssize_tに修正-----------//
         ssize_t nevent = kevent(kq, NULL, 0, eventlist, sizeof(*eventlist), NULL);
         for(ssize_t i = 0; i<nevent;i++){
             eventExecute(conf, eventlist[i].ident, tcpSockets);
->>>>>>> 06e8c515c5f53e744c66e3f23e0993204ae9b134
         }
         //---------size_tをssize_tに修正-----------//
     }
@@ -102,13 +95,6 @@ void HttpConnection::establishTcpConnection(Config *conf, SOCKET sockfd){
     struct sockaddr_storage client_sa;  // sockaddr_in 型ではない。 
     socklen_t len = sizeof(client_sa);   
     int newSocket = accept(sockfd, (struct sockaddr*) &client_sa, &len);
-<<<<<<< HEAD
-    pid_t pid = fork();
-    if(pid == 0){
-        startCommunicateWithClient(conf, newSocket);
-    }
-    close(newSocket);
-=======
     //----------acceptのエラー処理追加------------
     if (newSocket < 0)
     {
@@ -118,17 +104,10 @@ void HttpConnection::establishTcpConnection(Config *conf, SOCKET sockfd){
     //----------acceptのエラー処理追加------------
     createNewEvent(newSocket);
     eventRegister(newSocket);
->>>>>>> 06e8c515c5f53e744c66e3f23e0993204ae9b134
     std::cout << "event socket = " << sockfd << std::endl;
     std::cout << "new socket = " << newSocket << std::endl;
 }
 
-<<<<<<< HEAD
-void HttpConnection::closeParentSockets(){
-    for(keventMap::iterator it=tcpEvents.begin(); it != tcpEvents.end();it++){
-        close(it->first);
-    }
-=======
 void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
     char buf[MAX_BUF_LENGTH];
     int bytesReceived = recv(sockfd, &buf, MAX_BUF_LENGTH, MSG_DONTWAIT);
@@ -197,7 +176,6 @@ void HttpConnection::sendResponse(Config *conf, RequestParse& requestInfo, SOCKE
     else //GET,POST,DELETE以外の実装していないメソッド
         sendNotImplementedPage(sockfd);
     // -------------リクエストごとに振り分ける処理を追加-------------
->>>>>>> 06e8c515c5f53e744c66e3f23e0993204ae9b134
 }
 
 void HttpConnection::startCommunicateWithClient(Config *conf, SOCKET newSocket){
