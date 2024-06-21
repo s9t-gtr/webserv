@@ -42,7 +42,7 @@ clean:
 	@rm -rf upload.cgi.dSYM
 
 fclean: clean
-	rm -rf $(NAME) ../cgi/$(CGI) ../cgi/$(CGI2) ../cgi_post/$(CGI_POST)
+	rm -rf $(NAME) ../cgi/$(CGI) ../cgi/$(CGI2) ../cgi_post/$(CGI_POST) ../.vscode
 
 re: fclean all;
 

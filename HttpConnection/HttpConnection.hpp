@@ -79,6 +79,7 @@ class HttpConnection{
         bool isAllowedMethod(Location* location, std::string method);
         void sendTimeoutPage(SOCKET sockfd);
         void sendInternalErrorPage(SOCKET sockfd);
+        void sendBadRequestPage(SOCKET sockfd);
 
         bool isReadNewLine(std::string tmpBuffer);
         bool bodyConfirm(tmpInfo info);

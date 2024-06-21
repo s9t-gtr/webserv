@@ -265,21 +265,6 @@ std::string HttpConnection::selectLocationSetting(std::map<std::string, Location
     return (bestMatch);
 }
 
-bool HttpConnection::isAllowedMethod(Location* location, std::string method)
-{
-    if(location->locationSetting["allow_method"] == "none")
-        return true;
-    std::vector<std::string>status = split(location->locationSetting["allow_method"], ' ');
-    for (std::vector<std::string>::iterator it = status.begin(); it != status.end(); ++it)
-    {
-        if (*it == method)
-            break;
-        if (it == status.end() - 1)
-            return false;
-    }
-    return true;
-}
-
 void handleTimeout(int sig)
 {
     (void)sig;
@@ -309,23 +294,6 @@ bool isCgi(RequestParse& requestInfo)
     }
 }
 
-std::string HttpConnection::selectLocationSetting(std::map<std::string, Location*> &locations, std::string request_path)
-{
-    std::string bestMatch = "";
-    for (std::map<std::string, Location*>::const_iterator it = locations.begin(); it != locations.end(); ++it)
-    {
-        if (it->second->locationSetting.find("locationPath") != it->second->locationSetting.end())
-        {
-            const std::string &locationPath = it->second->locationSetting["locationPath"];
-            if (request_path.substr(0, locationPath.size()) == locationPath)
-            {
-                if (locationPath.size() > bestMatch.size())
-                    bestMatch = locationPath;
-            }
-        }
-    }
-    return (bestMatch);
-}
 
 bool HttpConnection::isAllowedMethod(Location* location, std::string method)
 {
@@ -340,35 +308,6 @@ bool HttpConnection::isAllowedMethod(Location* location, std::string method)
             return false;
     }
     return true;
-}
-
-void handleTimeout(int sig)
-{
-    (void)sig;
-    std::cerr << "Error: CGI script execution timed out" << std::endl;
-    // 必要ならば他のクリーンアップ処理をここに追加
-    std::exit(1);
-}
-
-bool isCgi(RequestParse& requestInfo)
-{
-    std::string path = requestInfo.getPath();
-    
-    // パスの長さが4以上か確認
-    if (path.length() >= 4) {
-        // 最後の4文字を取得
-        std::string lastFourChars = path.substr(path.length() - 4);
-        
-        // 最後の4文字が ".cgi" であるか確認
-        if (lastFourChars == ".cgi") {
-            // ここに処理を追加
-            return true;
-        } else {
-            return false;
-        }
-    } else {
-        return false;
-    }
 }
 
 void HttpConnection::sendResponse(Config *conf, RequestParse& requestInfo, SOCKET sockfd){
@@ -512,4 +451,3 @@ void HttpConnection::createResponseFromCgiOutput(pid_t pid, SOCKET sockfd, int p
         }
     }
 }
-P
