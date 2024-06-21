@@ -15,7 +15,8 @@
 struct tmpInfo{
     enum Status{
         Recv,
-        Send
+        Send,
+        Cgi_read
     };
     Status status;
     std::string tmpBuffer;
