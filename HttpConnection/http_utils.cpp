@@ -33,7 +33,7 @@ void HttpConnection::sendRedirectPage(SOCKET sockfd, Location* location)
         perror("send error"); //返り値が-1のときはシステムコールの失敗
         delete events[sockfd];
         close(sockfd);
-        std::exit(EXIT_FAILURE);
+        // std::exit(EXIT_FAILURE);
     }
 }
 
@@ -77,7 +77,7 @@ void HttpConnection::sendDefaultErrorPage(SOCKET sockfd, VirtualServer* server)
         perror("send error"); //返り値が-1のときはシステムコールの失敗
         delete events[sockfd];
         close(sockfd);
-        std::exit(EXIT_FAILURE);
+        // std::exit(EXIT_FAILURE);
     }
 }
 

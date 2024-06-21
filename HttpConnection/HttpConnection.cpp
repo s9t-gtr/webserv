@@ -67,7 +67,7 @@ void HttpConnection::startEventLoop(Config *conf, socketSet tcpSockets){
         //---------size_tをssize_tに修正-----------//
         ssize_t nevent = kevent(kq, NULL, 0, eventlist, sizeof(*eventlist), NULL);
         for(ssize_t i = 0; i<nevent;i++){
-            usleep(1100);
+            // usleep(1100);
             eventExecute(conf, eventlist[i].ident, tcpSockets);
         }
         //---------size_tをssize_tに修正-----------//
@@ -110,7 +110,40 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
         // std::cout << "HTTP REQUEST"<< std::endl;
         std::string request = std::string(buf, buf+bytesReceived);
         // std::cout << buf << std::endl;
+        try
+        {
+            RequestParse requestInfoTemp(request);
+        }
+        catch(const std::exception& e)
+        {
+            sendBadRequestPage(sockfd);
+            return;
+        }
         RequestParse requestInfo(request);
+
+        std::string host = requestInfo.getHeader("Host");
+        if (!host.empty() && host[host.length() - 1] == '\r') {
+            host.erase(host.length() - 1);
+        }
+        if (host != "localhost")
+        {
+            size_t pos = host.find(':'); // ':' の位置を検索
+            if (pos != std::string::npos) { // ':' が見つかった場合
+                host.erase(pos); // ':' 以降を削除
+            }
+        }
+        std::map<std::string, VirtualServer*>::const_iterator it;
+        for (it = conf->servers_.begin(); it != conf->servers_.end(); ++it) {
+            if (it->first == host) {
+                break;
+            }
+        }
+        if (it == conf->servers_.end())
+        {
+            sendBadRequestPage(sockfd);
+            return;
+        }
+
         sendResponse(conf, requestInfo, sockfd);
     }   
 
@@ -124,7 +157,7 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
         perror("recv error"); //返り値が-1のときはシステムコールの失敗
         delete events[sockfd];
         close(sockfd);
-        std::exit(EXIT_FAILURE);
+        // std::exit(EXIT_FAILURE);
     }
     //----------recvのエラー処理追加------------
 }
@@ -162,6 +195,35 @@ bool HttpConnection::isAllowedMethod(Location* location, std::string method)
     return true;
 }
 
+void handleTimeout(int sig)
+{
+    (void)sig;
+    std::cerr << "Error: CGI script execution timed out" << std::endl;
+    // 必要ならば他のクリーンアップ処理をここに追加
+    std::exit(1);
+}
+
+bool isCgi(RequestParse& requestInfo)
+{
+    std::string path = requestInfo.getPath();
+    
+    // パスの長さが4以上か確認
+    if (path.length() >= 4) {
+        // 最後の4文字を取得
+        std::string lastFourChars = path.substr(path.length() - 4);
+        
+        // 最後の4文字が ".cgi" であるか確認
+        if (lastFourChars == ".cgi") {
+            // ここに処理を追加
+            return true;
+        } else {
+            return false;
+        }
+    } else {
+        return false;
+    }
+}
+
 void HttpConnection::sendResponse(Config *conf, RequestParse& requestInfo, SOCKET sockfd){
     //今回指定されたバーチャルサーバーの設定情報を使いたいのでインスタンス化
     VirtualServer* server = conf->getServer(requestInfo.getHostName());
@@ -188,7 +250,7 @@ void HttpConnection::sendResponse(Config *conf, RequestParse& requestInfo, SOCKE
         // else if (requestInfo.getPath().substr(0, 11) == "/autoindex/")
         //     sendAutoindexPage(requestInfo, sockfd, server, location);
         //cgi
-        else if (requestInfo.getPath() == "/cgi/test.cgi")//<- .cgi実行ファイルもMakefileで作成・削除できるようにする
+        else if (isCgi(requestInfo) == true)//<- .cgi実行ファイルもMakefileで作成・削除できるようにする
         {
             int pipe_c2p[2];
             if(pipe(pipe_c2p) < 0)
@@ -210,7 +272,7 @@ void HttpConnection::sendResponse(Config *conf, RequestParse& requestInfo, SOCKE
             sendNotAllowedPage(sockfd);
             return ;
         }
-        if (requestInfo.getPath() == "/upload/")// リクエストパスがアップロード可能なディレクトリならファイルの作成
+        if (requestInfo.getPath() == UPLOAD)// リクエストパスがアップロード可能なディレクトリならファイルの作成
             postProcess(requestInfo, sockfd, server);
         else//メソッドがPOSTなのにリクエストパスが"/upload/"以外の場合
             sendForbiddenPage(sockfd);
@@ -223,7 +285,7 @@ void HttpConnection::sendResponse(Config *conf, RequestParse& requestInfo, SOCKE
             sendNotAllowedPage(sockfd);
             return ;
         }
-        if (requestInfo.getPath().substr(0, 8) == "/upload/")// リクエストパスがアップロード可能なディレクトリならファイルの削除
+        if (requestInfo.getPath().substr(0, 8) == UPLOAD)// リクエストパスがアップロード可能なディレクトリならファイルの削除
             deleteProcess(requestInfo, sockfd, server);
         else//メソッドがDELETEなのにリクエストパスが"/upload/"以外の場合
             sendForbiddenPage(sockfd);
@@ -237,18 +299,43 @@ void HttpConnection::executeCgi(Config *conf, RequestParse& requestInfo, int pip
     close(pipe_c2p[R]);
     dup2(pipe_c2p[W],1);
     close(pipe_c2p[W]);
+
+    signal(SIGALRM, handleTimeout);
+    alarm(5);
+
     extern char** environ;
     VirtualServer* server = conf->getServer(requestInfo.getHostName());
     std::string cgiPath = server->getCgiPath();
     char* const cgi_argv[] = { const_cast<char*>(cgiPath.c_str()), NULL };
-    if(execve("../cgi/test.cgi", cgi_argv, environ) < 0)
+
+    std::string path = ".." + requestInfo.getPath();
+    const char* cPath = path.c_str();
+
+    if(execve(cPath, cgi_argv, environ) < 0)
         std::cout << "Error: execve() failed" << std::endl;
 }
 
 void HttpConnection::createResponseFromCgiOutput(pid_t pid, SOCKET sockfd, int pipe_c2p[2]){
     char res_buf[MAX_BUF_LENGTH];
-    waitpid(pid, NULL, 0);
+    int status;
+    waitpid(pid, &status, 0);
     close(pipe_c2p[W]);
+    int exit_status;
+	if (WIFSIGNALED(status) != 0)
+		exit_status = WTERMSIG(status);
+	else
+		exit_status = WEXITSTATUS(status);
+    if (exit_status == 1)
+    {
+        sendInternalErrorPage(sockfd);
+        return ;
+    }
+    if (exit_status == 14)
+    {
+        sendTimeoutPage(sockfd);
+        return ;
+    }
+
     ssize_t byte = read(pipe_c2p[R], &res_buf, MAX_BUF_LENGTH);
     if (byte == 0)
     {
@@ -260,7 +347,7 @@ void HttpConnection::createResponseFromCgiOutput(pid_t pid, SOCKET sockfd, int p
         perror("read error"); //返り値が-1のときはシステムコールの失敗
         delete events[sockfd];
         close(sockfd);
-        std::exit(EXIT_FAILURE);
+        // std::exit(EXIT_FAILURE);
     }
     if(byte > 0){
         res_buf[byte] = '\0';
@@ -274,7 +361,7 @@ void HttpConnection::createResponseFromCgiOutput(pid_t pid, SOCKET sockfd, int p
             perror("send error"); //返り値が-1のときはシステムコールの失敗
             delete events[sockfd];
             close(sockfd);
-            std::exit(EXIT_FAILURE);
+            // std::exit(EXIT_FAILURE);
         }
     }
 }

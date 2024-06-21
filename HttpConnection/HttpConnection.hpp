@@ -7,6 +7,8 @@
 #include <sstream>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <signal.h>
+#include <sys/wait.h>
 
 typedef struct timespec timespec;
 typedef std::map<int, struct kevent*> keventMap;
@@ -14,6 +16,7 @@ typedef std::map<int, struct kevent*> keventMap;
 #define W 1
 #define R 0
 #define MAX_BUF_LENGTH 4096
+#define UPLOAD "/upload/"
 
 class HttpConnection{
     private:
@@ -58,6 +61,9 @@ class HttpConnection{
         void requestEntityPage(SOCKET sockfd);
         std::string selectLocationSetting(std::map<std::string, Location*> &locations, std::string request_path);
         bool isAllowedMethod(Location* location, std::string method);
+        void sendTimeoutPage(SOCKET sockfd);
+        void sendInternalErrorPage(SOCKET sockfd);
+        void sendBadRequestPage(SOCKET sockfd);
 };
 
 #endif
