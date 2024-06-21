@@ -40,7 +40,7 @@ static std::string getDisplayedDate(const struct dirent *entry, std::string path
     if (stat(path.c_str(), &path_stat) < 0)
     {
         perror("stat");
-        std::exit(EXIT_FAILURE);
+        // std::exit(EXIT_FAILURE);
     }
 
     char date_str[256];
@@ -59,7 +59,7 @@ static std::string getDisplayedSize(const struct dirent *entry, std::string path
     if (stat(path.c_str(), &path_stat) < 0)
     {
         perror("stat");
-        std::exit(EXIT_FAILURE);
+        // std::exit(EXIT_FAILURE);
     }
 
     std::stringstream ss;
@@ -77,7 +77,7 @@ static std::string getIndexList(std::string path, std::string path_fixed)
     DIR *dir = opendir(path_fixed.c_str());
     if (dir == NULL) {
         perror("opendir");
-        std::exit(EXIT_FAILURE);
+        // std::exit(EXIT_FAILURE);
     }
 
     struct dirent *entry;
@@ -98,20 +98,20 @@ static std::string getIndexList(std::string path, std::string path_fixed)
 }
 
 // AutoindexPageを作成して返す関数(autoindexディレクトリのexample.htmlを参考に作成した)
-void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd)
+void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location)
 {
     std::string path_fixed = ".." + requestInfo.getPath();
 
     struct stat info;
     if (stat(path_fixed.c_str(), &info) != 0) {
         // パスにアクセスできない場合
-        return sendDefaultErrorPage(sockfd);
+        return sendDefaultErrorPage(sockfd, server);
     } else if (info.st_mode & S_IFDIR) {
         // パスがディレクトリである場合
         ;
     } else {
         // パスがディレクトリではない場合(ファイルの時)
-        return sendStaticPage(requestInfo, sockfd);
+        return sendStaticPage(requestInfo, sockfd, server, location);
     }
 
     std::string content;
@@ -143,8 +143,16 @@ void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd)
     response += "\n";
     response += content;
     // std::cout << response << std::endl;
-    if(send(sockfd, response.c_str(), response.length(), 0) < 0)
-        std::cerr << "Error: send() failed" << std::endl;
-    else
-        std::cout << "send!!!!!!" << std::endl;
+    int status = send(sockfd, response.c_str(), response.length(), 0);
+    if (status == 0){
+        delete events[sockfd];
+        close(sockfd); //返り値が0のときは接続の失敗
+    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
+    if (status < 0)
+    {
+        perror("send error"); //返り値が-1のときはシステムコールの失敗
+        delete events[sockfd];
+        close(sockfd);
+        // std::exit(EXIT_FAILURE);
+    }
 }

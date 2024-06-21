@@ -15,9 +15,6 @@
 #include "Location.hpp"
 #include "utils.hpp"
 
-#define WARNING "WARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNINGWARNING"
-
-
 #define SOCKET int
 #define INVALID_SOCKET -1 
 #define STORE_OK true;
@@ -46,7 +43,7 @@ class Config{
         static Config* getInstance(std::string configPath);
         static void readConfig(Config *inst);
         socketSet getTcpSockets();
-        VirtualServer getServer(const std::string serverName);
+        VirtualServer* getServer(const std::string serverName);
     private:
         static void exploreHttpBlock(std::ifstream *ifs);
         static void exploreServerBlock(std::ifstream *ifs);
