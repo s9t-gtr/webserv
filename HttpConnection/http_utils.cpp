@@ -28,12 +28,12 @@ void HttpConnection::sendRedirectPage(SOCKET sockfd, Location* location)
         delete events[sockfd];
         close(sockfd); //返り値が0のときは接続の失敗
     } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-    else 
+    if (status < 0)
     {
         perror("send error"); //返り値が-1のときはシステムコールの失敗
         delete events[sockfd];
         close(sockfd);
-        std::exit(EXIT_FAILURE);
+        // std::exit(EXIT_FAILURE);
     }
 }
 
@@ -72,12 +72,12 @@ void HttpConnection::sendDefaultErrorPage(SOCKET sockfd, VirtualServer* server)
         delete events[sockfd];
         close(sockfd); //返り値が0のときは接続の失敗
     } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-    else 
+    if (status < 0)
     {
         perror("send error"); //返り値が-1のときはシステムコールの失敗
         delete events[sockfd];
         close(sockfd);
-        std::exit(EXIT_FAILURE);
+        // std::exit(EXIT_FAILURE);
     }
 }
 
@@ -138,17 +138,15 @@ void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, Vi
     response += "Content-Type: text/html\n";
     response += "\n";
     response += content;
-
     int status = send(sockfd, response.c_str(), response.length(), 0);
     if (status == 0){
         delete events[sockfd];
         close(sockfd); //返り値が0のときは接続の失敗
     } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-    else 
+    if (status < 0)
     {
         perror("send error"); //返り値が-1のときはシステムコールの失敗
         delete events[sockfd];
         close(sockfd);
-        std::exit(EXIT_FAILURE);
     }
 }

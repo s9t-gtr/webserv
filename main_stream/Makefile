@@ -9,34 +9,41 @@ CPPS =  ../config/utils.cpp ../config/Config.cpp ../config/VirtualServer.cpp ../
 OBJS = ${CPPS:.cpp=.o}
 
 NAME = webserv
-CGI = test.cgi
+CGI = test1.cgi
+CGI2 = test2.cgi
 CGI_POST = upload.cgi
 CXX = c++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -g3
+
+all: $(NAME) $(CGI) $(CGI2) $(CGI_POST)
+	@mv $(CGI) ../cgi
+	@mv $(CGI2) ../cgi
+	@mv $(CGI_POST) ../cgi_post
+
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) -o $(NAME)
 
-$(CGI): ../cgi/test.cpp
-	@$(CXX) $(CXXFLAGS) ../cgi/test.cpp -o $(CGI)
+$(CGI): ../cgi/test1.cpp
+	@$(CXX) $(CXXFLAGS) ../cgi/test1.cpp -o $(CGI)
+
+$(CGI2): ../cgi/test2.cpp
+	@$(CXX) $(CXXFLAGS) ../cgi/test2.cpp -o $(CGI2)
 
 $(CGI_POST): ../cgi_post/upload.cpp
 	@$(CXX) $(CXXFLAGS) ../cgi_post/upload.cpp -o $(CGI_POST)
 
-.PHONY: all clean fclean re
-
-all: $(NAME) $(CGI) $(CGI_POST)
-	@mv $(CGI) ../cgi
-	@mv $(CGI_POST) ../cgi_post
-
 clean: 
 	rm -rf $(OBJS)
-	rm -rf test.cgi.dSYM
-	rm -rf upload.cgi.dSYM
+	@rm -rf test1.cgi.dSYM
+	@rm -rf test2.cgi.dSYM
+	@rm -rf upload.cgi.dSYM
 
 fclean: clean
-	rm -rf $(NAME) ../cgi/$(CGI) ../cgi_post/$(CGI_POST)
+	rm -rf $(NAME) ../cgi/$(CGI) ../cgi/$(CGI2) ../cgi_post/$(CGI_POST)
 
 re: fclean all;
+
+.PHONY: all clean fclean re
