@@ -8,6 +8,12 @@ int main(void)
   /* 出力データを文字列としてためておくための変数 */
   string strOutData;
 
+  // while (1)
+  // {
+  //   int a;
+  //   (void)a;
+  // }
+
   /* httpヘッダ */
   /* HTML出力であることを出力 */
 strOutData = "HTTP/1.1 200 OK\n";
@@ -26,7 +32,7 @@ strOutData += "Keep-Alive: timeout=5, max=100\n";
 strOutData += "Connection: Keep-Alive\n";
 strOutData += "Content-Type: text/html\n";
 strOutData += "\n";
-strOutData += "<html><body><h1>It works!</h1></body></html>";
+strOutData += "<html><body><h1>This page made by CGI!</h1></body></html>";
   /* 標準出力に設定内容を出力 */
   std::cout << strOutData.c_str();
 }

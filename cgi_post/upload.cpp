@@ -22,12 +22,12 @@ static std::string uploadFile(std::string upload_dir, std::string request_body)
     char timestamp[20];
     std::strftime(timestamp, sizeof(timestamp), "%Y%m%d%H%M%S", now);
 
-    std::string file_path = ".." + upload_dir + timestamp;
+    std::string file_path = upload_dir + timestamp;
 
     std::ofstream file(file_path.c_str());
     if (!file.is_open()) {
         perror("open error");
-        std::exit(EXIT_FAILURE);
+        // std::exit(EXIT_FAILURE);
     }
 
     file << request_body;

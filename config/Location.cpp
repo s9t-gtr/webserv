@@ -48,3 +48,43 @@ std::string Location::getLocationPath(){
     locationSetting["locationPath"] = path;//この行追加で複数location格納成功
     return locationSetting["locationPath"];
 }
+
+void Location::confirmValuesLocation(){
+    confirmIndex();
+    confirmRoot();
+    confirmAllowMethod();
+    confirmAutoindex();
+    confirmReturn();
+}
+
+void Location::confirmIndex()
+{
+    if(locationSetting.find("index") == locationSetting.end())
+        setSetting("index", "none");
+}
+
+void Location::confirmRoot()
+{
+    if(locationSetting.find("root") == locationSetting.end())
+        setSetting("root", "documents/");
+}
+
+void Location::confirmAllowMethod()
+{
+    if(locationSetting.find("allow_method") == locationSetting.end())
+        setSetting("allow_method", "none");
+}
+
+void Location::confirmAutoindex()
+{
+    if(locationSetting.find("autoindex") == locationSetting.end())
+        setSetting("autoindex", "off");
+    if (locationSetting["autoindex"] != "on" && locationSetting["autoindex"] != "off")
+        throw std::runtime_error("error: autoindex should be on or off");
+}
+
+void Location::confirmReturn()
+{
+    if(locationSetting.find("return") == locationSetting.end())
+        setSetting("return", "none");
+}

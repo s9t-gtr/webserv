@@ -3,26 +3,42 @@
 
 #include "../config/Config.hpp"
 #include "../request/RequestParse.hpp"
-<<<<<<< HEAD
-#include "HttpSession.hpp"
-=======
 #include <dirent.h>
 #include <sstream>
 #include <sys/types.h>
 #include <sys/stat.h>
->>>>>>> 06e8c515c5f53e744c66e3f23e0993204ae9b134
+#include <signal.h>
+#include <sys/wait.h>
+#include <sstream>
+#include <sys/event.h>
+
+struct tmpInfo{
+    enum Status{
+        Recv,
+        Send,
+        Read_Cgi,
+        Send_Cgi
+    };
+    Status status;
+    std::string tmpBuffer;
+    std::string::size_type content_length;
+    int readFd;
+};
 
 typedef struct timespec timespec;
 typedef std::map<int, struct kevent*> keventMap;
+typedef std::map<int, tmpInfo> tmpInfoMap;
 
 #define W 1
 #define R 0
-#define MAX_BUF_LENGTH 4096
+#define MAX_BUF_LENGTH 64
+#define UPLOAD "/upload/"
 
 class HttpConnection{
     private:
         static int kq;
-        static keventMap tcpEvents;
+        // static keventMap changelist;
+        static tmpInfoMap tmpInfos;
         static struct kevent *eventlist;
         static timespec timeSpec;
     private:
@@ -38,29 +54,40 @@ class HttpConnection{
     private:
         static void connectionPrepare(socketSet tcpSockets);
         static void createKqueue();
-        static void createTcpConnectionEvents(socketSet tcpSockets);
+        static void createTcpConnectionChangelist(socketSet tcpSockets);
         static void createNewEvent(SOCKET targetSocket);
-        static void eventRegister(SOCKET fd);
-        void deleteZombie();
-        void eventConnect(Config *conf, SOCKET sockefd, socketSet tcpSockets);
-        void establishTcpConnection(Config *conf, SOCKET sockfd);
-        void startCommunicateWithClient(Config *conf, SOCKET newSocket);
-        void closeParentSockets();
+        static void eventRegister(struct kevent *changelist);
+        void eventExecute(Config *conf, SOCKET sockefd, socketSet tcpSockets);
+        void establishTcpConnection(SOCKET sockfd);
+        // bool isExistBuffer(SOCKET sockfd);
         void requestHandler(Config *conf, SOCKET sockfd);
         void sendResponse(Config *conf, RequestParse& requestInfo, SOCKET sockfd);
         void executeCgi(Config *conf, RequestParse& requestInfo, int *pipe_c2p);
         void createResponseFromCgiOutput(pid_t pid, SOCKET sockfd, int pipe_c2p[2]);
 
-        void sendDefaultErrorPage(SOCKET sockfd);
-        void sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd);
+        void sendDefaultErrorPage(SOCKET sockfd, VirtualServer* server);
+        void sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location);
+        void sendToClient(SOCKET sockfd, std::string response);
         std::string getGmtDate();
-        void sendStaticPage(RequestParse& requestInfo, SOCKET sockfd);
-        void sendRedirectPage(SOCKET sockfd);
-        void postProcess(RequestParse& requestInfo, SOCKET sockfd);
+        void sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location);
+        void sendRedirectPage(SOCKET sockfd, Location* location);
+        void postProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server);
         void executeCgi_postVersion(RequestParse& requestInfo, int pipe_c2p[2]);
         void sendForbiddenPage(SOCKET sockfd);
-        void deleteProcess(RequestParse& requestInfo, SOCKET sockfd);
+        void deleteProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server);
         void sendNotImplementedPage(SOCKET sockfd);
+        void sendNotAllowedPage(SOCKET sockfd);
+        void requestEntityPage(SOCKET sockfd);
+        std::string selectLocationSetting(std::map<std::string, Location*> &locations, std::string request_path);
+        bool isAllowedMethod(Location* location, std::string method);
+        void sendTimeoutPage(SOCKET sockfd);
+        void sendInternalErrorPage(SOCKET sockfd);
+        void sendBadRequestPage(SOCKET sockfd);
+
+        bool isReadNewLine(std::string tmpBuffer);
+        bool bodyConfirm(tmpInfo info);
+        bool checkCompleteRecieved(tmpInfo info);
+        void createConnectEvent(SOCKET targetSocket);
 };
 
 #endif

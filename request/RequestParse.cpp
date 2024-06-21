@@ -3,6 +3,13 @@
 RequestParse::RequestParse(std::string requestMessage){
     setMethodPathVersion(requestMessage);
     setHeadersAndBody(requestMessage);
+    if (headers.find("Host") == headers.end()) {
+        throw std::runtime_error("Error: Missing required 'host' header");
+    }
+    if (version != "HTTP/1.1")
+    {
+        throw std::runtime_error("Error: Invalid version");
+    }
 }
 
 RequestParse::~RequestParse(){
@@ -16,9 +23,11 @@ RequestParse::RequestParse(const RequestParse& other){
 
 RequestParse& RequestParse::operator=(const RequestParse& other){
     if(this != &other){
-        const_cast<std::string&>(method) = other.method;
-        const_cast<std::string&>(path) = other.path;
-        const_cast<std::string&>(version) = other.version;
+    method = other.method;
+    path = other.path;
+    version = other.version;
+    headers = other.headers;
+    body = other.body;
 
         return *this;
     }
@@ -36,6 +45,20 @@ std::string RequestParse::getRequestLine(std::string& requestMessage){
 
 void RequestParse::setMethodPathVersion(std::string& requestMessage){
     std::string firstRow = getRequestLine(requestMessage);
+
+    int spaceCount = 0;
+    std::string::const_iterator it;
+    for (it = firstRow.begin(); it != firstRow.end(); ++it) {
+        if (*it == ' ') {
+            spaceCount++;
+        }
+    }
+    if (*it == ' ')
+        throw std::runtime_error("Invalid request line format: Incorrect number of spaces");
+    if (spaceCount != 2) {
+        throw std::runtime_error("Invalid request line format: Incorrect number of spaces");
+    }
+
     strVec splitFirstRow = split(firstRow, ' ');
     if(splitFirstRow.size() != 3)
         throw std::runtime_error("Error: invalid request: non space in first line"); 
@@ -67,7 +90,6 @@ void RequestParse::setHeaders(strVec linesVec, strVec::iterator& it){
 }
 
 void RequestParse::setBody(strVec  linesVec, strVec::iterator itFromBody) {
-    std::cout << (*itFromBody).size() << std::endl;
     if((*itFromBody).size() == 0 || itFromBody == linesVec.end()){
         body = "";
         return;
@@ -182,6 +204,7 @@ std::string createDirectiveFromSplitVec(strVec line){
 strVec createHeaderAndDirective(strVec::iterator it){
     strVec line = split(*it, ':');
     if(line.size() < 2){
+        std::cerr << *it << std::endl;
         throw std::runtime_error("Unexpected Error: Encountered header not delimited by ':'");//Notice: このケースがあるならParseの方法を変更しなければならない
     }
     if(line.size() > 2)
@@ -193,7 +216,8 @@ std::string RequestParse::getHostName(){
     std::string directive = getHeader("Host");
     if(directive != ""){
         strVec spDirective = split(directive, ':');
-        return spDirective[0];
+
+        return spDirective.size() != 2 ? "localhost" : spDirective[0];
     }
     return "";
 }

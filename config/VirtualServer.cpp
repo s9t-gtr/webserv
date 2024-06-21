@@ -36,6 +36,17 @@ void VirtualServer::setSetting(std::string directiveName, std::string directiveC
     if(serverSetting.find(directiveName) != serverSetting.end())
         throw std::runtime_error(directiveName+" is duplicate");
     serverSetting[directiveName] = directiveContent;
+    if (directiveName == "client_max_body_size")
+    {
+        if (directiveContent.empty())
+            throw std::runtime_error("Error: client_max_body_size is empty");
+        std::istringstream iss(directiveContent);
+        unsigned long number;
+        char c;
+        if (!(iss >> number) || (iss.get(c))) {
+            throw std::runtime_error("Error: client_max_body_size is invalid");
+    }
+    }
 }
 std::string VirtualServer::getServerName(){
     return serverSetting["server_name"];
@@ -64,7 +75,7 @@ void VirtualServer::confirmServerName(){
 
 void VirtualServer::confirmListenPort(){
     if(serverSetting.find("listen") == serverSetting.end()){
-        setSetting("listen", "8080");
+        setSetting("listen", "80");
         return;
     }
     size_t len = serverSetting["listen"].size();
@@ -91,13 +102,19 @@ void VirtualServer::confirmListenPort(){
 
 void VirtualServer::confirmErrorPage(){
     if(serverSetting.find("error_page") == serverSetting.end()){
-        setSetting("error_page", "404 document/404.html");
+        setSetting("error_page", "documents/404_default.html");
         return;
     }
     std::vector<std::string>status = split(serverSetting["error_page"], ' ');
-    std::vector<std::string>::iterator it=status.begin();
+    std::vector<std::string>::iterator it = status.begin();
     if(*it != "404")
         throw std::runtime_error("Error: select 404"); //error_pageの設定は404のみに対応させる
+    it++;
+    std::string error_page_path = *it;
+    serverSetting["error_page"] = error_page_path;
+    it++;
+    if (it != status.end())
+        throw std::runtime_error("Error: invalid error_page path");
 }
 
 
@@ -106,7 +123,7 @@ std::string VirtualServer::getCgiPath(){
 }
 void VirtualServer::confirmCgi(){
     if(serverSetting.find("cgi_path") == serverSetting.end()){
-        setSetting("cgi_path", "../cgi/default.cgi");
+        setSetting("cgi_path", "cgi/default.cgi");
         return ;
     }
 }
