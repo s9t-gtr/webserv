@@ -52,8 +52,7 @@ void HttpConnection::createNewEvent(SOCKET targetSocket){
 }
 void HttpConnection::createConnectEvent(SOCKET targetSocket){
     events[targetSocket] = new struct kevent;
-    EV_SET(events[targetSocket], targetSocket, EVFILT_READ, EV_ADD , 0, 0, NULL);
-    EV_SET(events[targetSocket], targetSocket, EVFILT_WRITE, EV_ADD , 0, 0, NULL);
+    EV_SET(events[targetSocket], targetSocket, EVFILT_READ, EV_ADD, 0, 0, NULL);
     if(kevent(kq, events[targetSocket], 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
         perror("kevent"); // kevent: エラーメッセージ
         printf("errno = %d (%s)\n", errno, strerror(errno)); 
@@ -186,8 +185,9 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
             // RequestParse requestInfo(request);
             // sendResponse(conf, requestInfo, sockfd);
             tmpInfos[sockfd].status = tmpInfo::Send;
-            EV_SET(events[sockfd], sockfd, EVFILT_WRITE, EV_ENABLE, 0, 0, NULL);
-            EV_SET(events[sockfd], sockfd, EVFILT_READ, EV_DISABLE, 0, 0, NULL);
+            EV_SET(events[sockfd], sockfd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
+            // EV_SET(events[sockfd], sockfd, EVFILT_WRITE, EV_ENABLE, 0, 0, NULL);
+            // EV_SET(events[sockfd], sockfd, EVFILT_READ, EV_DISABLE, 0, 0, NULL);
             if(kevent(kq, events[sockfd], 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
                 perror("kevent"); // kevent: エラーメッセージ
                 printf("errno = %d (%s)\n", errno, strerror(errno)); 
@@ -205,8 +205,10 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
                 // RequestParse requestInfo(tmpInfos[sockfd].tmpBuffer);
                 // sendResponse(conf, requestInfo, sockfd);
                 tmpInfos[sockfd].status = tmpInfo::Send;
-                EV_SET(events[sockfd], sockfd, EVFILT_WRITE, EV_ENABLE, 0, 0, NULL);
-                EV_SET(events[sockfd], sockfd, EVFILT_READ, EV_DISABLE, 0, 0, NULL);
+                // EV_SET(events[sockfd], sockfd, EVFILT_WRITE, EV_ENABLE, 0, 0, NULL);
+                EV_SET(events[sockfd], sockfd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
+
+                // EV_SET(events[sockfd], sockfd, EVFILT_READ, EV_DISABLE, 0, 0, NULL);
                 if(kevent(kq, events[sockfd], 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
                     perror("kevent"); // kevent: エラーメッセージ
                     printf("errno = %d (%s)\n", errno, strerror(errno)); 
@@ -234,13 +236,19 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
         //----------recvのエラー処理追加------------
     }
     else if(tmpInfos[sockfd].status == tmpInfo::Send){
-            std::cout << "==========EVENT SEND==========" << std::endl;
-            std::cout << "event socket = " << sockfd << std::endl;
+        std::cout << "==========EVENT SEND==========" << std::endl;
+        std::cout << "event socket = " << sockfd << std::endl;
 
         RequestParse requestInfo(tmpInfos[sockfd].tmpBuffer);
         sendResponse(conf, requestInfo, sockfd);
-        EV_SET(events[sockfd], sockfd, EVFILT_WRITE, EV_DISABLE, 0, 0, NULL);
-        EV_SET(events[sockfd], sockfd, EVFILT_READ, EV_ENABLE, 0, 0, NULL);
+        // EV_SET(events[sockfd], sockfd, EVFILT_WRITE, EV_DISABLE, 0, 0, NULL);
+        // EV_SET(events[sockfd], sockfd, EVFILT_READ, EV_ENABLE, 0, 0, NULL);
+        EV_SET(events[sockfd], sockfd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+        if(kevent(kq, events[sockfd], 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
+            perror("kevent"); // kevent: エラーメッセージ
+            printf("errno = %d (%s)\n", errno, strerror(errno)); 
+            throw std::runtime_error("Error: kevent() failed()");
+        }
         tmpInfos.erase(sockfd);
     }
 }
