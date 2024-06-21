@@ -9,19 +9,34 @@
 #include <sys/stat.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <sstream>
+#include <sys/event.h>
+
+struct tmpInfo{
+    enum Status{
+        Recv,
+        Send,
+        Cgi_read
+    };
+    Status status;
+    std::string tmpBuffer;
+    std::string::size_type content_length;
+};
 
 typedef struct timespec timespec;
 typedef std::map<int, struct kevent*> keventMap;
+typedef std::map<int, tmpInfo> tmpInfoMap;
 
 #define W 1
 #define R 0
-#define MAX_BUF_LENGTH 4096
+#define MAX_BUF_LENGTH 64
 #define UPLOAD "/upload/"
 
 class HttpConnection{
     private:
         static int kq;
-        static keventMap tcpEvents;
+        static keventMap events;
+        static tmpInfoMap tmpInfos;
         static struct kevent *eventlist;
         static timespec timeSpec;
     private:
@@ -40,11 +55,9 @@ class HttpConnection{
         static void createTcpConnectionEvents(socketSet tcpSockets);
         static void createNewEvent(SOCKET targetSocket);
         static void eventRegister(SOCKET fd);
-        void deleteZombie();
-        void eventConnect(Config *conf, SOCKET sockefd, socketSet tcpSockets);
-        void establishTcpConnection(Config *conf, SOCKET sockfd);
-        void startCommunicateWithClient(Config *conf, SOCKET newSocket);
-        void closeParentSockets();
+        void eventExecute(Config *conf, SOCKET sockefd, socketSet tcpSockets);
+        void establishTcpConnection(SOCKET sockfd);
+        // bool isExistBuffer(SOCKET sockfd);
         void requestHandler(Config *conf, SOCKET sockfd);
         void sendResponse(Config *conf, RequestParse& requestInfo, SOCKET sockfd);
         void executeCgi(Config *conf, RequestParse& requestInfo, int *pipe_c2p);
@@ -66,7 +79,11 @@ class HttpConnection{
         bool isAllowedMethod(Location* location, std::string method);
         void sendTimeoutPage(SOCKET sockfd);
         void sendInternalErrorPage(SOCKET sockfd);
-        void sendBadRequestPage(SOCKET sockfd);
+
+        bool isReadNewLine(std::string tmpBuffer);
+        bool bodyConfirm(tmpInfo info);
+        bool checkCompleteRecieved(tmpInfo info);
+        void createConnectEvent(SOCKET targetSocket);
 };
 
 #endif
