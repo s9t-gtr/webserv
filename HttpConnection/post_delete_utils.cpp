@@ -26,18 +26,7 @@ void HttpConnection::sendForbiddenPage(SOCKET sockfd)
     response += "\n";
     response += content;
 
-    int status = send(sockfd, response.c_str(), response.length(), 0);
-    if (status == 0){
-        delete events[sockfd];
-        close(sockfd); //返り値が0のときは接続の失敗
-    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-    if (status < 0)
-    {
-        perror("send error"); //返り値が-1のときはシステムコールの失敗
-        delete events[sockfd];
-        close(sockfd);
-        // std::exit(EXIT_FAILURE);
-    }
+    sendToClient(sockfd, response);
 }
 
 void HttpConnection::sendNotAllowedPage(SOCKET sockfd)
@@ -66,18 +55,7 @@ void HttpConnection::sendNotAllowedPage(SOCKET sockfd)
     response += "\n";
     response += content;
 
-    int status = send(sockfd, response.c_str(), response.length(), 0);
-    if (status == 0){
-        delete events[sockfd];
-        close(sockfd); //返り値が0のときは接続の失敗
-    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-    if (status < 0)
-    {
-        perror("send error"); //返り値が-1のときはシステムコールの失敗
-        delete events[sockfd];
-        close(sockfd);
-        // std::exit(EXIT_FAILURE);
-    }
+    sendToClient(sockfd, response);
 }
 
 void HttpConnection::requestEntityPage(SOCKET sockfd)
@@ -106,18 +84,7 @@ void HttpConnection::requestEntityPage(SOCKET sockfd)
     response += "\n";
     response += content;
 
-    int status = send(sockfd, response.c_str(), response.length(), 0);
-    if (status == 0){
-        delete events[sockfd];
-        close(sockfd); //返り値が0のときは接続の失敗
-    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-    if (status < 0)
-    {
-        perror("send error"); //返り値が-1のときはシステムコールの失敗
-        delete events[sockfd];
-        close(sockfd);
-        // std::exit(EXIT_FAILURE);
-    }
+    sendToClient(sockfd, response);
 }
 
 void HttpConnection::sendNotImplementedPage(SOCKET sockfd)
@@ -146,18 +113,7 @@ void HttpConnection::sendNotImplementedPage(SOCKET sockfd)
     response += "\n";
     response += content;
 
-    int status = send(sockfd, response.c_str(), response.length(), 0);
-    if (status == 0){
-        delete events[sockfd];
-        close(sockfd); //返り値が0のときは接続の失敗
-    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-    if (status < 0)
-    {
-        perror("send error"); //返り値が-1のときはシステムコールの失敗
-        delete events[sockfd];
-        close(sockfd);
-        // std::exit(EXIT_FAILURE);
-    }
+    sendToClient(sockfd, response);
 }
 
 void HttpConnection::sendTimeoutPage(SOCKET sockfd)
@@ -186,18 +142,7 @@ void HttpConnection::sendTimeoutPage(SOCKET sockfd)
     response += "\n";
     response += content;
 
-    int status = send(sockfd, response.c_str(), response.length(), 0);
-    if (status == 0){
-        delete events[sockfd];
-        close(sockfd); //返り値が0のときは接続の失敗
-    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-    if (status < 0)
-    {
-        perror("send error"); //返り値が-1のときはシステムコールの失敗
-        delete events[sockfd];
-        close(sockfd);
-        // std::exit(EXIT_FAILURE);
-    }
+    sendToClient(sockfd, response);
 }
 
 void HttpConnection::sendInternalErrorPage(SOCKET sockfd)
@@ -226,18 +171,7 @@ void HttpConnection::sendInternalErrorPage(SOCKET sockfd)
     response += "\n";
     response += content;
 
-    int status = send(sockfd, response.c_str(), response.length(), 0);
-    if (status == 0){
-        delete events[sockfd];
-        close(sockfd); //返り値が0のときは接続の失敗
-    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-    if (status < 0)
-    {
-        perror("send error"); //返り値が-1のときはシステムコールの失敗
-        delete events[sockfd];
-        close(sockfd);
-        // std::exit(EXIT_FAILURE);
-    }
+    sendToClient(sockfd, response);
 }
 
 // GETのcgi関数と違うのはPOSTメソッドで届いたクライアントからのリクエストボディをexecveの引数に渡すところ
@@ -321,16 +255,5 @@ void HttpConnection::deleteProcess(RequestParse& requestInfo, SOCKET sockfd, Vir
     response += "Server: webserv/1.0.0\n";
     response += "\n";//ヘッダーとボディを分けるために、ボディが空でも必要
 
-    int status = send(sockfd, response.c_str(), response.length(), 0);
-    if (status == 0){
-        delete events[sockfd];
-        close(sockfd); //返り値が0のときは接続の失敗
-    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-    if (status < 0)
-    {
-        perror("send error"); //返り値が-1のときはシステムコールの失敗
-        delete events[sockfd];
-        close(sockfd);
-        // std::exit(EXIT_FAILURE);
-    }
+    sendToClient(sockfd, response);
 }

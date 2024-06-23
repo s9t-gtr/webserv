@@ -1,6 +1,6 @@
-#include "../config/Config.hpp"
-#include "../request/RequestParse.hpp"
-#include "../HttpConnection/HttpConnection.hpp"
+#include "config/Config.hpp"
+#include "request/RequestParse.hpp"
+#include "HttpConnection/HttpConnection.hpp"
 #include <sys/wait.h>
 
 #define W 1

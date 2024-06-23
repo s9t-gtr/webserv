@@ -65,6 +65,7 @@ class HttpConnection{
 
         void sendDefaultErrorPage(SOCKET sockfd, VirtualServer* server);
         void sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location);
+        void sendToClient(SOCKET sockfd, std::string response);
         std::string getGmtDate();
         void sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location);
         void sendRedirectPage(SOCKET sockfd, Location* location);

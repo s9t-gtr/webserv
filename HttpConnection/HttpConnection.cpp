@@ -243,7 +243,7 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
         tmpInfos.erase(sockfd);
     }
     else if(tmpInfos[sockfd].status == tmpInfo::Cgi_read){
-
+        
     }
 }
 
