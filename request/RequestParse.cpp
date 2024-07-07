@@ -3,6 +3,13 @@
 RequestParse::RequestParse(std::string requestMessage){
     setMethodPathVersion(requestMessage);
     setHeadersAndBody(requestMessage);
+    if (headers.find("Host") == headers.end()) {
+        throw std::runtime_error("Error: Missing required 'host' header");
+    }
+    if (version != "HTTP/1.1")
+    {
+        throw std::runtime_error("Error: Invalid version");
+    }
 }
 
 RequestParse::~RequestParse(){
@@ -16,9 +23,11 @@ RequestParse::RequestParse(const RequestParse& other){
 
 RequestParse& RequestParse::operator=(const RequestParse& other){
     if(this != &other){
-        const_cast<std::string&>(method) = other.method;
-        const_cast<std::string&>(path) = other.path;
-        const_cast<std::string&>(version) = other.version;
+    method = other.method;
+    path = other.path;
+    version = other.version;
+    headers = other.headers;
+    body = other.body;
 
         return *this;
     }
@@ -36,6 +45,20 @@ std::string RequestParse::getRequestLine(std::string& requestMessage){
 
 void RequestParse::setMethodPathVersion(std::string& requestMessage){
     std::string firstRow = getRequestLine(requestMessage);
+
+    int spaceCount = 0;
+    std::string::const_iterator it;
+    for (it = firstRow.begin(); it != firstRow.end(); ++it) {
+        if (*it == ' ') {
+            spaceCount++;
+        }
+    }
+    if (*it == ' ')
+        throw std::runtime_error("Invalid request line format: Incorrect number of spaces");
+    if (spaceCount != 2) {
+        throw std::runtime_error("Invalid request line format: Incorrect number of spaces");
+    }
+
     strVec splitFirstRow = split(firstRow, ' ');
     if(splitFirstRow.size() != 3)
         throw std::runtime_error("Error: invalid request: non space in first line"); 

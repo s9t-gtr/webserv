@@ -427,8 +427,8 @@ void HttpConnection::executeCgi(Config *conf, RequestParse& requestInfo, int pip
     dup2(pipe_c2p[W],1);
     close(pipe_c2p[W]);
 
-    // signal(SIGALRM, handleTimeout);
-    // alarm(10);
+    signal(SIGALRM, handleTimeout);
+    alarm(5);
 
     extern char** environ;
     VirtualServer* server = conf->getServer(requestInfo.getHostName());
@@ -459,13 +459,11 @@ void HttpConnection::createResponseFromCgiOutput(pid_t pid, SOCKET sockfd, int p
 		exit_status = WTERMSIG(status);
 	else
 		exit_status = WEXITSTATUS(status);
-
     if (exit_status == 1)
     {
         sendInternalErrorPage(sockfd);
         return ;
     }
-
     if (exit_status == 14)
     {
         sendTimeoutPage(sockfd);

@@ -102,7 +102,11 @@ void VirtualServer::confirmListenPort(){
 
 void VirtualServer::confirmErrorPage(){
     if(serverSetting.find("error_page") == serverSetting.end()){
+<<<<<<< HEAD
         setSetting("error_page", "documents/404_default.html");
+=======
+        setSetting("error_page", "../documents/404_default.html");
+>>>>>>> c76dbe29ec1974e3792a314a3f7ed79e1e859758
         return;
     }
     std::vector<std::string>status = split(serverSetting["error_page"], ' ');

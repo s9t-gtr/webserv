@@ -1,5 +1,45 @@
 #include "HttpConnection.hpp"
 
+void HttpConnection::sendBadRequestPage(SOCKET sockfd)
+{
+    // 403.htmlの内容を取得
+    std::ifstream file("../documents/400.html");
+    if (!file.is_open()) {
+        perror("open error");
+        // std::exit(EXIT_FAILURE);
+    }
+    std::string line;
+    std::string content;
+    while (std::getline(file, line)) {
+        content += line;
+        content += "\n";
+    }
+    file.close();
+
+    std::string response;
+    response = "HTTP/1.1 400 Bad Request\n";
+    response += "Server: webserv42tokyo\n";
+    response += "Date: " + getGmtDate() + "\n"; 
+    response += "Content-Length: " + std::to_string(content.size()) + "\n";
+    response += "Connection: Keep-Alive\n";
+    response += "Content-Type: text/html\n";
+    response += "\n";
+    response += content;
+
+    int status = send(sockfd, response.c_str(), response.length(), 0);
+    if (status == 0){
+        // delete events[sockfd];
+        close(sockfd); //返り値が0のときは接続の失敗
+    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
+    if (status < 0)
+    {
+        perror("send error"); //返り値が-1のときはシステムコールの失敗
+        // delete events[sockfd];
+        close(sockfd);
+        // std::exit(EXIT_FAILURE);
+    }
+}
+
 void HttpConnection::sendForbiddenPage(SOCKET sockfd)
 {
     // 403.htmlの内容を取得
