@@ -181,6 +181,7 @@ std::string createDirectiveFromSplitVec(strVec line){
 strVec createHeaderAndDirective(strVec::iterator it){
     strVec line = split(*it, ':');
     if(line.size() < 2){
+        std::cerr << *it << std::endl;
         throw std::runtime_error("Unexpected Error: Encountered header not delimited by ':'");//Notice: このケースがあるならParseの方法を変更しなければならない
     }
     if(line.size() > 2)

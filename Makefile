@@ -41,16 +41,13 @@ $(CGI_POST): cgi_post/upload.cpp
 	@$(CXX) $(CXXFLAGS) cgi_post/upload.cpp -o $(CGI_POST)
 
 clean: 
-	rm -rf $(OBJS)
-	@rm -rf test1.cgi.dSYM
-	@rm -rf test2.cgi.dSYM
-	@rm -rf upload.cgi.dSYM
+	rm -rf $(OBJS) *.dSYM
 
 fclean: clean
 	rm -rf $(NAME) cgi/$(CGI) cgi/$(CGI2) cgi_post/$(CGI_POST)
 
 re: fclean all;
-debug:
+debug: fclean;
 	$(MAKE) DEBUG=1 all
 
 .PHONY: all clean fclean re debug

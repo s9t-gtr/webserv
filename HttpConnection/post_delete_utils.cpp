@@ -3,7 +3,7 @@
 void HttpConnection::sendForbiddenPage(SOCKET sockfd)
 {
     // 403.htmlの内容を取得
-    std::ifstream file("../documents/403.html");
+    std::ifstream file("documents/403.html");
     if (!file.is_open()) {
         perror("open error");
         // std::exit(EXIT_FAILURE);
@@ -32,7 +32,7 @@ void HttpConnection::sendForbiddenPage(SOCKET sockfd)
 void HttpConnection::sendNotAllowedPage(SOCKET sockfd)
 {
     // 403.htmlの内容を取得
-    std::ifstream file("../documents/405.html");
+    std::ifstream file("documents/405.html");
     if (!file.is_open()) {
         perror("open error");
         // std::exit(EXIT_FAILURE);
@@ -61,7 +61,7 @@ void HttpConnection::sendNotAllowedPage(SOCKET sockfd)
 void HttpConnection::requestEntityPage(SOCKET sockfd)
 {
     // 403.htmlの内容を取得
-    std::ifstream file("../documents/413.html");
+    std::ifstream file("documents/413.html");
     if (!file.is_open()) {
         perror("open error");
         // std::exit(EXIT_FAILURE);
@@ -90,7 +90,7 @@ void HttpConnection::requestEntityPage(SOCKET sockfd)
 void HttpConnection::sendNotImplementedPage(SOCKET sockfd)
 {
     // 501.htmlの内容を取得
-    std::ifstream file("../documents/501.html");
+    std::ifstream file("documents/501.html");
     if (!file.is_open()) {
         perror("open error");
         // std::exit(EXIT_FAILURE);
@@ -119,7 +119,7 @@ void HttpConnection::sendNotImplementedPage(SOCKET sockfd)
 void HttpConnection::sendTimeoutPage(SOCKET sockfd)
 {
     // 504.htmlの内容を取得
-    std::ifstream file("../documents/504.html");
+    std::ifstream file("documents/504.html");
     if (!file.is_open()) {
         perror("open error");
         // std::exit(EXIT_FAILURE);
@@ -148,7 +148,7 @@ void HttpConnection::sendTimeoutPage(SOCKET sockfd)
 void HttpConnection::sendInternalErrorPage(SOCKET sockfd)
 {
     // 504.htmlの内容を取得
-    std::ifstream file("../documents/500.html");
+    std::ifstream file("documents/500.html");
     if (!file.is_open()) {
         perror("open error");
         // std::exit(EXIT_FAILURE);
@@ -181,7 +181,7 @@ void HttpConnection::executeCgi_postVersion(RequestParse& requestInfo, int pipe_
     dup2(pipe_c2p[W],1);
     close(pipe_c2p[W]);
     extern char** environ;
-    std::string cgiPath = "../cgi_post/upload.cgi";
+    std::string cgiPath = "cgi_post/upload.cgi";
     std::string upload_dir = requestInfo.getPath();
     std::string request_body = requestInfo.getBody();
     char* const cgi_argv[] = { const_cast<char*>(cgiPath.c_str()), const_cast<char*>(upload_dir.c_str()), const_cast<char*>(request_body.c_str()), NULL };
@@ -191,7 +191,7 @@ void HttpConnection::executeCgi_postVersion(RequestParse& requestInfo, int pipe_
 
 void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server)
 {
-    std::string directory = "../upload";
+    std::string directory = "upload";
     // 一応、/upload/ディレクトリがちゃんと存在するか確認
     struct stat info;
     if (stat(directory.c_str(), &info) != 0 || !(info.st_mode & S_IFDIR))
@@ -225,7 +225,9 @@ void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, Virtu
 
 void HttpConnection::deleteProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server)
 {
-    std::string file_path = ".." + requestInfo.getPath();
+    std::string file_path = requestInfo.getPath();
+    if(file_path[0] == '/')
+        file_path = file_path.substr(1);
 
     struct stat info;
     // 削除対象のファイル,ディレクトリの存在をチェック

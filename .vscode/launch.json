@@ -8,7 +8,7 @@
             "type": "lldb",
             "request": "launch",
             "name": "Debug",
-            "program": "${workspaceFolder}/main_stream/webserv",
+            "program": "${workspaceFolder}/webserv",
             "args": ["configures/default.conf"],
             "cwd": "${workspaceFolder}"
         }

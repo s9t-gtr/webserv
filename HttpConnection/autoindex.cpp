@@ -100,7 +100,9 @@ static std::string getIndexList(std::string path, std::string path_fixed)
 // AutoindexPageを作成して返す関数(autoindexディレクトリのexample.htmlを参考に作成した)
 void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location)
 {
-    std::string path_fixed = ".." + requestInfo.getPath();
+    std::string path_fixed = requestInfo.getPath();
+    if(path_fixed[0] == '/')
+        path_fixed = path_fixed.substr(1);
 
     struct stat info;
     if (stat(path_fixed.c_str(), &info) != 0) {

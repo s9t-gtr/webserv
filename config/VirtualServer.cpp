@@ -102,7 +102,7 @@ void VirtualServer::confirmListenPort(){
 
 void VirtualServer::confirmErrorPage(){
     if(serverSetting.find("error_page") == serverSetting.end()){
-        setSetting("error_page", "../documents/404_default.html");
+        setSetting("error_page", "documents/404_default.html");
         return;
     }
     std::vector<std::string>status = split(serverSetting["error_page"], ' ');
@@ -123,7 +123,7 @@ std::string VirtualServer::getCgiPath(){
 }
 void VirtualServer::confirmCgi(){
     if(serverSetting.find("cgi_path") == serverSetting.end()){
-        setSetting("cgi_path", "../cgi/default.cgi");
+        setSetting("cgi_path", "cgi/default.cgi");
         return ;
     }
 }

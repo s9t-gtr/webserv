@@ -1,7 +1,7 @@
 #include "HttpConnection.hpp"
 
 int HttpConnection::kq;
-keventMap HttpConnection::events;
+// keventMap HttpConnection::changelist;
 struct kevent *HttpConnection::eventlist;
 timespec HttpConnection::timeSpec = {0,1000000000};
 tmpInfoMap HttpConnection::tmpInfos;
@@ -26,7 +26,7 @@ void HttpConnection::destroy(HttpConnection* inst){
 
 void HttpConnection::connectionPrepare(socketSet tcpSockets){
     createKqueue();
-    createTcpConnectionEvents(tcpSockets);
+    createTcpConnectionChangelist(tcpSockets);
     eventlist = new struct kevent[tcpSockets.size()*6]; //最近のブラウザは最大6つのtcpコネクションを確立するらしいのでtcpSockets*6倍のイベント容量を用意する
 }
 
@@ -38,51 +38,48 @@ void HttpConnection::createKqueue(){
         throw std::runtime_error("Error: kqueue() failed()"); 
     }
 }
-void HttpConnection::createTcpConnectionEvents(socketSet tcpSockets){
+void HttpConnection::createTcpConnectionChangelist(socketSet tcpSockets){
     for(socketSet::const_iterator it=tcpSockets.begin();it!=tcpSockets.end();it++){
         createNewEvent(*it);
-        eventRegister(*it);
+        // eventRegister(*it);
     }
 }
 
 void HttpConnection::createNewEvent(SOCKET targetSocket){
-    events[targetSocket] = new struct kevent;
-    EV_SET(events[targetSocket], targetSocket, EVFILT_READ, EV_ADD, 0, 0, NULL);
-    // EV_SET(events[targetSocket], targetSocket, EVFILT_WRITE, EV_ENABLE, 0, 0, NULL);
-}
-void HttpConnection::createConnectEvent(SOCKET targetSocket){
-    events[targetSocket] = new struct kevent;
-    EV_SET(events[targetSocket], targetSocket, EVFILT_READ, EV_ADD, 0, 0, NULL);
-    if(kevent(kq, events[targetSocket], 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
-        perror("kevent"); // kevent: エラーメッセージ
-        printf("errno = %d (%s)\n", errno, strerror(errno)); 
-        throw std::runtime_error("Error: kevent() failed()");
-    }
+    // changelist[targetSocket] = new struct kevent;
+    struct kevent changelist[1];
+    EV_SET(changelist, targetSocket, EVFILT_READ, EV_ADD, 0, 0, NULL);
+    eventRegister(changelist);
+    // EV_SET(changelist[targetSocket], targetSocket, EVFILT_WRITE, EV_ENABLE, 0, 0, NULL);
 }
 
-void HttpConnection::eventRegister(SOCKET fd){
-    if(kevent(kq, events[fd], 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
+void HttpConnection::eventRegister(struct kevent *changelist){
+    if(kevent(kq, changelist, 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
         perror("kevent"); // kevent: エラーメッセージ
         printf("errno = %d (%s)\n", errno, strerror(errno)); 
         // for(socketSet::const_iterator it=tcpSockets.begin();it!=tcpSockets.end();it++)
         //     close(*it);
         // for(socketSet::const_iterator it=tcpSockets.begin();*it!=fd;it++)
-        //     delete events[*it];
-        // delete events[fd];//現在のループで作った分
+        //     delete changelist[*it];
+        // delete changelist[fd];//現在のループで作った分
         throw std::runtime_error("Error: kevent() failed()");
     }
 }
 
 void HttpConnection::startEventLoop(Config *conf, socketSet tcpSockets){
     while(1){
-        //---------size_tをssize_tに修正-----------//
-
         ssize_t nevent = kevent(kq, NULL, 0, eventlist, sizeof(*eventlist), NULL);
         for(ssize_t i = 0; i<nevent;i++){
+            std::cerr << "eventlist.ident: " << eventlist[i].ident << std::endl;
             // usleep(1100);
-            eventExecute(conf, eventlist[i].ident, tcpSockets);
+            if(eventlist[i].filter == EVFILT_READ)
+                eventExecute(conf, eventlist[i].ident, tcpSockets);
+            //     ReadEventExecute(conf, eventlist[i].ident, tcpSockets);
+            else if(eventlist[i].filter == EVFILT_WRITE)
+                eventExecute(conf, eventlist[i].ident, tcpSockets);
+            // else if(eventlist[i].filter == EVFILT_PROC)
+
         }
-        //---------size_tをssize_tに修正-----------//
     }
 }
 
@@ -100,20 +97,18 @@ void HttpConnection::eventExecute(Config *conf, SOCKET sockfd, socketSet tcpSock
 //     return true;
 // }
 void HttpConnection::establishTcpConnection(SOCKET sockfd){
-    // std::cout << "TCP CONNECTION ESTABLISHED"<< std::endl;
+    std::cout << "TCP CONNECTION ESTABLISHED: socket: " << sockfd << std::endl;
 
     struct sockaddr_storage client_sa;  // sockaddr_in 型ではない。 
     socklen_t len = sizeof(client_sa);   
     int newSocket = accept(sockfd, (struct sockaddr*) &client_sa, &len);
-    //----------acceptのエラー処理追加------------
     if (newSocket < 0)
     {
         perror("accept");
         return;
     }
-    //----------acceptのエラー処理追加------------
-    createConnectEvent(newSocket);
-    eventRegister(newSocket);
+    std::cout << "connection socket: " << newSocket << std::endl;
+    createNewEvent(newSocket);
     // std::cout << "event socket = " << sockfd << std::endl;
     // std::cout << "new socket = " << newSocket << std::endl;
 }
@@ -143,9 +138,9 @@ bool HttpConnection::checkCompleteRecieved(tmpInfo info){
         if(target != std::string::npos){
             std::stringstream ss;
             ss << line.substr(target+15);
-            std::cerr << "content_length : " << ss.str() << std::endl;
+            // std::cerr << "content_length : " << ss.str() << std::endl;
             ss >> info.content_length;
-            std::cerr << "info.content_length: " << info.content_length << std::endl;
+            // std::cerr << "info.content_length: " << info.content_length << std::endl;
         }
         head = tail + 1;
         tail = info.tmpBuffer.find("\n", head);
@@ -169,21 +164,19 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
         tmpInfos[sockfd].content_length = 0;
     }
     if(tmpInfos[sockfd].status == tmpInfo::Recv){
+            std::cout << "Status: Recv" << std::endl;
         int bytesReceived = recv(sockfd, &buf, MAX_BUF_LENGTH, MSG_DONTWAIT);
-        std::cout << "bytesRecieved: " << bytesReceived << std::endl;
+        // std::cout << "bytesRecieved: " << bytesReceived << std::endl;
         if(MAX_BUF_LENGTH > bytesReceived && bytesReceived > 0){
-            std::cout << "==========EVENT RECV==========" << std::endl;
-            std::cout << "event socket = " << sockfd << std::endl;
-            std::cout << "HTTP REQUEST"<< std::endl;
             std::string request;
             if(tmpInfos.find(sockfd) != tmpInfos.end()){
                 request = tmpInfos[sockfd].tmpBuffer;
             }
             request += std::string(buf, buf+bytesReceived);
-            // std::cout << request << std::endl;
             tmpInfos[sockfd].status = tmpInfo::Send;
-            EV_SET(events[sockfd], sockfd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
-            if(kevent(kq, events[sockfd], 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
+            struct kevent changelist[1];
+            EV_SET(changelist, sockfd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
+            if(kevent(kq, changelist, 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
                 perror("kevent"); // kevent: エラーメッセージ
                 printf("errno = %d (%s)\n", errno, strerror(errno)); 
                 throw std::runtime_error("Error: kevent() failed()");
@@ -192,17 +185,15 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
         }   
         //----------recvのエラー処理追加------------
         else if(bytesReceived == MAX_BUF_LENGTH){
-            std::cout << "==========EVENT RECV==========" << std::endl;
-            std::cout << "event socket = " << sockfd << std::endl;
+            // std::cout << "==========EVENT RECV==========" << std::endl;
+            // std::cout << "event socket = " << sockfd << std::endl;
             tmpInfos[sockfd].tmpBuffer += std::string(buf, buf+bytesReceived);
-        // std::cerr << tmpInfos[sockfd].tmpBuffer << std::endl;
             if(checkCompleteRecieved(tmpInfos[sockfd])){
-                // RequestParse requestInfo(tmpInfos[sockfd].tmpBuffer);
-                // sendResponse(conf, requestInfo, sockfd);
                 tmpInfos[sockfd].status = tmpInfo::Send;
-                // EV_SET(events[sockfd], sockfd, EVFILT_WRITE, EV_ENABLE, 0, 0, NULL);
-                EV_SET(events[sockfd], sockfd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
-                if(kevent(kq, events[sockfd], 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
+                struct kevent changelist[1];
+
+                EV_SET(changelist, sockfd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
+                if(kevent(kq, changelist, 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
                     perror("kevent"); // kevent: エラーメッセージ
                     printf("errno = %d (%s)\n", errno, strerror(errno)); 
                     throw std::runtime_error("Error: kevent() failed()");
@@ -213,37 +204,80 @@ void HttpConnection::requestHandler(Config *conf, SOCKET sockfd){
         }
         else if (bytesReceived == 0)
         {
-            perror("recv error");
+            std::cerr << "client close this connect: socket: " << sockfd << std::endl;
+            // perror("recv error");
             tmpInfos.erase(sockfd);
-            delete events[sockfd];
+            // delete changelist[sockfd];
             close(sockfd); //返り値が0のときは接続の失敗
+            tmpInfos.erase(sockfd);
         } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
         else 
         {
+            std::cerr << "recv(): return " << bytesReceived << std::endl;
+
             perror("recv error"); //返り値が-1のときはシステムコールの失敗
             tmpInfos.erase(sockfd);
-            delete events[sockfd];
+            // delete changelist[sockfd];
             close(sockfd);
             std::cout << "sockfd = " << sockfd <<": closeしちゃっった" << std::endl;;
         }
         //----------recvのエラー処理追加------------
     }
     else if(tmpInfos[sockfd].status == tmpInfo::Send){
-        std::cout << "==========EVENT SEND==========" << std::endl;
-        std::cout << "event socket = " << sockfd << std::endl;
-
+        std::cout << "Status: Send" << std::endl;
         RequestParse requestInfo(tmpInfos[sockfd].tmpBuffer);
+        std::cout << "sendResponse()" << std::endl;
         sendResponse(conf, requestInfo, sockfd);
-        EV_SET(events[sockfd], sockfd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
-        if(kevent(kq, events[sockfd], 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
+        if(tmpInfos[sockfd].status != tmpInfo::Read_Cgi){
+            struct kevent changelist[1];
+            EV_SET(changelist, sockfd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+            if(kevent(kq, changelist, 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
+                perror("kevent"); // kevent: エラーメッセージ
+                printf("errno = %d (%s)\n", errno, strerror(errno)); 
+                throw std::runtime_error("Error: kevent() failed()");
+            }
+            tmpInfos.erase(sockfd);
+        }
+    }
+    else if(tmpInfos[sockfd].status == tmpInfo::Read_Cgi){
+        std::cerr << "Status: Read CGI" << std::endl;
+
+        char res_buf[MAX_BUF_LENGTH];
+
+        ssize_t byte = read(tmpInfos[sockfd].readFd, &res_buf, MAX_BUF_LENGTH);
+        if (byte == 0)
+        {
+            // close(sockfd);
+            std::cout << "DEBUG: read return 0 byte" << std::endl;
+            tmpInfos.erase(sockfd);
+        }
+        if (byte == -1)
+        {
+            perror("read error"); //返り値が-1のときはシステムコールの失敗
+            close(sockfd);
+            tmpInfos.erase(sockfd);
+
+            // std::exit(EXIT_FAILURE);
+        }
+        if(byte > 0){
+            res_buf[byte] = '\0';
+            tmpInfos[sockfd].tmpBuffer += res_buf;
+            if(checkCompleteRecieved(tmpInfos[sockfd])){
+                tmpInfos[sockfd].status = tmpInfo::Send_Cgi;
+            }
+        }
+    }
+    else if(tmpInfos[sockfd].status == tmpInfo::Send_Cgi){
+        std::cerr << "Status: Send CGI" << std::endl;
+        sendToClient(sockfd, tmpInfos[sockfd].tmpBuffer);
+        struct kevent changelist[1];
+        EV_SET(changelist, sockfd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+        if(kevent(kq, changelist, 1, NULL, 0, NULL) == -1){ // ポーリングするためにはtimeout引数を非NULLのtimespec構造体ポインタを指す必要がある
             perror("kevent"); // kevent: エラーメッセージ
             printf("errno = %d (%s)\n", errno, strerror(errno)); 
             throw std::runtime_error("Error: kevent() failed()");
         }
         tmpInfos.erase(sockfd);
-    }
-    else if(tmpInfos[sockfd].status == tmpInfo::Cgi_read){
-        
     }
 }
 
@@ -319,9 +353,10 @@ void HttpConnection::sendResponse(Config *conf, RequestParse& requestInfo, SOCKE
 
     // std::cout << "========" << location->path << "========" << std::endl;//デバッグ
 
-    // -------------リクエストごとに振り分ける処理を追加-------------
     if (requestInfo.getMethod() == "GET")
     {
+        std::cout << "GET" << std::endl;
+
         // allow_methodが設定され、かつGETが含まれていなかった場合
         if (isAllowedMethod(location, "GET") == false)
         {
@@ -337,7 +372,14 @@ void HttpConnection::sendResponse(Config *conf, RequestParse& requestInfo, SOCKE
         //cgi
         else if (isCgi(requestInfo) == true)//<- .cgi実行ファイルもMakefileで作成・削除できるようにする
         {
+        std::cout << "isCGI" << std::endl;
+
             int pipe_c2p[2];
+            VirtualServer* server = conf->getServer(requestInfo.getHostName());
+            std::string cgiPath = server->getCgiPath();
+            std::string path = requestInfo.getPath();
+            if(path[0] == '/')
+                path = path.substr(1);
             if(pipe(pipe_c2p) < 0)
                 throw std::runtime_error("Error: pipe() failed");
             pid_t pid = fork();
@@ -385,25 +427,31 @@ void HttpConnection::executeCgi(Config *conf, RequestParse& requestInfo, int pip
     dup2(pipe_c2p[W],1);
     close(pipe_c2p[W]);
 
-    signal(SIGALRM, handleTimeout);
-    alarm(5);
+    // signal(SIGALRM, handleTimeout);
+    // alarm(10);
 
     extern char** environ;
     VirtualServer* server = conf->getServer(requestInfo.getHostName());
     std::string cgiPath = server->getCgiPath();
+    //NOTICE: cgiの存在チェックがされていない
     char* const cgi_argv[] = { const_cast<char*>(cgiPath.c_str()), NULL };
 
-    std::string path = ".." + requestInfo.getPath();
+    std::string path = requestInfo.getPath();
+    if(path[0] == '/')
+        path = path.substr(1);
     const char* cPath = path.c_str();
 
+    //NOTICE: confのcgi_pathとrequestされたcgiが異なっていたらどうなる
     if(execve(cPath, cgi_argv, environ) < 0)
         std::cout << "Error: execve() failed" << std::endl;
 }
 
 void HttpConnection::createResponseFromCgiOutput(pid_t pid, SOCKET sockfd, int pipe_c2p[2]){
-    char res_buf[MAX_BUF_LENGTH];
     int status;
+    //NOTICE: 無限ループ対策してない
     waitpid(pid, &status, 0);
+        std::cout << "waitpid()" << std::endl;
+
     close(pipe_c2p[W]);
 
     int exit_status;
@@ -423,33 +471,7 @@ void HttpConnection::createResponseFromCgiOutput(pid_t pid, SOCKET sockfd, int p
         sendTimeoutPage(sockfd);
         return ;
     }
-
-    ssize_t byte = read(pipe_c2p[R], &res_buf, MAX_BUF_LENGTH);
-    if (byte == 0)
-    {
-        delete events[sockfd];
-        close(sockfd);
-    }
-    if (byte == -1)
-    {
-        perror("read error"); //返り値が-1のときはシステムコールの失敗
-        delete events[sockfd];
-        close(sockfd);
-        // std::exit(EXIT_FAILURE);
-    }
-    if(byte > 0){
-        res_buf[byte] = '\0';
-        int status = send(sockfd, &res_buf, byte, 0);
-        if (status == 0){
-            delete events[sockfd];
-            close(sockfd); //返り値が0のときは接続の失敗
-        } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-        if (status < 0)
-        {
-            perror("send error"); //返り値が-1のときはシステムコールの失敗
-            delete events[sockfd];
-            close(sockfd);
-            // std::exit(EXIT_FAILURE);
-        }
-    }
+    tmpInfos[sockfd].status = tmpInfo::Read_Cgi;
+    tmpInfos[sockfd].readFd = pipe_c2p[R];
+    tmpInfos[sockfd].tmpBuffer = "";
 }

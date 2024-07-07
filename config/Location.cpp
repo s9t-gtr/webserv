@@ -66,7 +66,7 @@ void Location::confirmIndex()
 void Location::confirmRoot()
 {
     if(locationSetting.find("root") == locationSetting.end())
-        setSetting("root", "../documents/");
+        setSetting("root", "documents/");
 }
 
 void Location::confirmAllowMethod()

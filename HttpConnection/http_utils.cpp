@@ -3,15 +3,19 @@
 void HttpConnection::sendToClient(SOCKET sockfd, std::string response){
     int status = send(sockfd, response.c_str(), response.length(), 0);
     if (status == 0){
-        delete events[sockfd];
+        // delete changelist[sockfd];
         close(sockfd); //返り値が0のときは接続の失敗
     } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-    if (status < 0)
+    else if (status < 0)
     {
         perror("send error"); //返り値が-1のときはシステムコールの失敗
-        delete events[sockfd];
+        // delete changelist[sockfd];
         close(sockfd);
         // std::exit(EXIT_FAILURE);
+    }
+    else
+    {
+        std::cout << "send() success" << std::endl;
     }
 }
 
@@ -34,7 +38,7 @@ void HttpConnection::sendRedirectPage(SOCKET sockfd, Location* location)
     response += "Connection: Keep-Alive\n";
     response += "Content-Length: 0\n";
     response += "Date: " + getGmtDate() + "\n"; 
-    response += "Server: webserv/1.0.0\n";
+    response += "Server: webserv/1.0.0\n"; 
     response += "Location: " + location->locationSetting["return"] + "\n";
     response += "\n";//ヘッダーとボディを分けるために、ボディが空でも必要
 
@@ -49,7 +53,7 @@ void HttpConnection::sendDefaultErrorPage(SOCKET sockfd, VirtualServer* server)
     std::ifstream file(error_page_path);
     if (!file.is_open()) {
         //ファイルパスが無効ならデフォルトを設定
-        error_page_path = "../documents/404_default.html";
+        error_page_path = "documents/404_default.html";
         file.close();  // 既存のファイルストリームを閉じる
         file.open(error_page_path);  // 新しいファイルを開く
     }
@@ -81,7 +85,7 @@ void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, Vi
     // std::cout << "========" << file_path << "========" << std::endl; //デバッグ
     // もしパスが指定されていないときは、デフォルトのindex.htmlページを送る
     if (requestInfo.getPath() == "/")
-        file_path = "../documents/index.html";
+        file_path = "documents/index.html";
 
     struct stat info;
     // 対象のファイル,ディレクトリの存在をチェックしつつ、infoに情報を読み込む
@@ -133,13 +137,13 @@ void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, Vi
     response += content;
     int status = send(sockfd, response.c_str(), response.length(), 0);
     if (status == 0){
-        delete events[sockfd];
+        // delete changelist[sockfd];
         close(sockfd); //返り値が0のときは接続の失敗
     } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
     if (status < 0)
     {
         perror("send error"); //返り値が-1のときはシステムコールの失敗
-        delete events[sockfd];
+        // delete changelist[sockfd];
         close(sockfd);
     }
 }

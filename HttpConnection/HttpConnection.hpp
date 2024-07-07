@@ -16,11 +16,13 @@ struct tmpInfo{
     enum Status{
         Recv,
         Send,
-        Cgi_read
+        Read_Cgi,
+        Send_Cgi
     };
     Status status;
     std::string tmpBuffer;
     std::string::size_type content_length;
+    int readFd;
 };
 
 typedef struct timespec timespec;
@@ -35,7 +37,7 @@ typedef std::map<int, tmpInfo> tmpInfoMap;
 class HttpConnection{
     private:
         static int kq;
-        static keventMap events;
+        // static keventMap changelist;
         static tmpInfoMap tmpInfos;
         static struct kevent *eventlist;
         static timespec timeSpec;
@@ -52,9 +54,9 @@ class HttpConnection{
     private:
         static void connectionPrepare(socketSet tcpSockets);
         static void createKqueue();
-        static void createTcpConnectionEvents(socketSet tcpSockets);
+        static void createTcpConnectionChangelist(socketSet tcpSockets);
         static void createNewEvent(SOCKET targetSocket);
-        static void eventRegister(SOCKET fd);
+        static void eventRegister(struct kevent *changelist);
         void eventExecute(Config *conf, SOCKET sockefd, socketSet tcpSockets);
         void establishTcpConnection(SOCKET sockfd);
         // bool isExistBuffer(SOCKET sockfd);

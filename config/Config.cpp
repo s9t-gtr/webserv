@@ -52,6 +52,8 @@ SOCKET tcpListen(std::string hostname, std::string port){
         struct addrinfo *result = NULL;
         SOCKET sockfd;
         
+        // createHints(hints, );
+        
         memset(&hints, 0, sizeof(hints));
         hints.ai_family = AF_INET6;
         hints.ai_socktype = SOCK_STREAM; // TCPソケット
