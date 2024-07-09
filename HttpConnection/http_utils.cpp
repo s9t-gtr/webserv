@@ -1,22 +1,23 @@
 #include "HttpConnection.hpp"
 
 void HttpConnection::sendToClient(SOCKET sockfd, std::string response){
+    //std::cerr << "DEBUG: sendtoClient() in " << std::endl;
+
     int status = send(sockfd, response.c_str(), response.length(), 0);
     if (status == 0){
-        // delete changelist[sockfd];
+        // delete obj;
+        perror("send error1");
+        printf("errno = %d (%s)\n", errno, strerror(errno));
         close(sockfd); //返り値が0のときは接続の失敗
     } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-    else if (status < 0)
-    {
-        perror("send error"); //返り値が-1のときはシステムコールの失敗
-        // delete changelist[sockfd];
+    else if (status < 0){
+        // delete obj;
+        perror("send error2"); //返り値が-1のときはシステムコールの失敗
+        printf("errno = %d (%s)\n", errno, strerror(errno));
         close(sockfd);
-        // std::exit(EXIT_FAILURE);
-    }
-    else
-    {
+    }else
         std::cout << "send() success" << std::endl;
-    }
+
 }
 
 // サーバーからのレスポンスヘッダーに含まれるGMT時刻を取得する関数
@@ -33,6 +34,8 @@ std::string HttpConnection::getGmtDate()
 // サーバーからのレスポンスとしてリダイレクトページを送る関数
 void HttpConnection::sendRedirectPage(SOCKET sockfd, Location* location)
 {
+    //std::cerr << "DEBUG: sendRedirectPage() in" << std::endl;
+
     std::string response;
     response = "HTTP/1.1 301 Moved Permanently\n";
     response += "Connection: Keep-Alive\n";
@@ -43,6 +46,8 @@ void HttpConnection::sendRedirectPage(SOCKET sockfd, Location* location)
     response += "\n";//ヘッダーとボディを分けるために、ボディが空でも必要
 
     sendToClient(sockfd, response);
+            //std::cerr << "DEBUG: sendRedirectPage() out" << std::endl;
+
 }
 
 // サーバーからのレスポンスとしてデフォルトのエラーページを送る関数
@@ -102,6 +107,7 @@ void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, Vi
             file_path = location->locationSetting["index"];
         else if (location->locationSetting["autoindex"] == "on")
         {
+            std::cerr << "auto index" << std::endl;
             sendAutoindexPage(requestInfo, sockfd, server, location);
             return ;
         }
@@ -146,4 +152,47 @@ void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, Vi
         // delete changelist[sockfd];
         close(sockfd);
     }
+}
+
+bool HttpConnection::checkCompleteRecieved(progressInfo obj){
+    std::string::size_type head = 0;
+    std::string::size_type tail = obj.buffer.find("\n");
+    while(obj.content_length == 0 && tail != std::string::npos){
+        std::string line = obj.buffer.substr(head, tail);
+        std::string::size_type target = line.find("Content_Length:");
+        if(target != std::string::npos){
+            std::stringstream ss;
+            ss << line.substr(target+15);
+            // std::cerr << "content_length : " << ss.str() << std::endl;
+            ss >> obj.content_length;
+            // std::cerr << "obj.content_length: " << obj.content_length << std::endl;
+        }
+        head = tail + 1;
+        tail = obj.buffer.find("\n", head);
+    }
+    if(isReadNewLine(obj.buffer) && obj.content_length == 0){
+        std::cerr << "Complete recieved" << std::endl;
+        return true; //get method && no body request
+    }
+    else if(isReadNewLine(obj.buffer) && bodyConfirm(obj)){
+        std::cerr << "Complete recieved" << std::endl;
+        return true; // already read body of request
+    }
+    return false;
+}
+
+bool HttpConnection::isReadNewLine(std::string buffer){
+    if(buffer.find("\n\r\n") != std::string::npos || buffer.find("\n\n") != std::string::npos)
+        return true;
+    return false;
+}
+
+bool HttpConnection::bodyConfirm(progressInfo info){
+    std::string::size_type newLineIdx = info.buffer.find("\n\r\n");
+    if(newLineIdx == std::string::npos)
+        newLineIdx = info.buffer.find("\n\n");
+    std::string tmpBody = info.buffer.substr(newLineIdx+1);
+    if(tmpBody.size() == info.content_length)
+        return true;
+    return false;
 }

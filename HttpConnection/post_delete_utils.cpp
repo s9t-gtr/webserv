@@ -6,7 +6,7 @@ void HttpConnection::sendBadRequestPage(SOCKET sockfd)
     std::ifstream file("../documents/400.html");
     if (!file.is_open()) {
         perror("open error");
-        // std::exit(EXIT_FAILURE);
+        
     }
     std::string line;
     std::string content;
@@ -36,7 +36,7 @@ void HttpConnection::sendBadRequestPage(SOCKET sockfd)
         perror("send error"); //返り値が-1のときはシステムコールの失敗
         // delete events[sockfd];
         close(sockfd);
-        // std::exit(EXIT_FAILURE);
+        
     }
 }
 
@@ -46,7 +46,7 @@ void HttpConnection::sendForbiddenPage(SOCKET sockfd)
     std::ifstream file("documents/403.html");
     if (!file.is_open()) {
         perror("open error");
-        // std::exit(EXIT_FAILURE);
+        
     }
     std::string line;
     std::string content;
@@ -71,11 +71,13 @@ void HttpConnection::sendForbiddenPage(SOCKET sockfd)
 
 void HttpConnection::sendNotAllowedPage(SOCKET sockfd)
 {
+    //std::cerr << "DEBUG: sendAllowMethod() in " << std::endl;
+
     // 403.htmlの内容を取得
     std::ifstream file("documents/405.html");
     if (!file.is_open()) {
         perror("open error");
-        // std::exit(EXIT_FAILURE);
+        
     }
     std::string line;
     std::string content;
@@ -96,6 +98,8 @@ void HttpConnection::sendNotAllowedPage(SOCKET sockfd)
     response += content;
 
     sendToClient(sockfd, response);
+    //std::cerr << "DEBUG: sendAllowMethod() out" << std::endl;
+
 }
 
 void HttpConnection::requestEntityPage(SOCKET sockfd)
@@ -104,7 +108,7 @@ void HttpConnection::requestEntityPage(SOCKET sockfd)
     std::ifstream file("documents/413.html");
     if (!file.is_open()) {
         perror("open error");
-        // std::exit(EXIT_FAILURE);
+        
     }
     std::string line;
     std::string content;
@@ -133,7 +137,7 @@ void HttpConnection::sendNotImplementedPage(SOCKET sockfd)
     std::ifstream file("documents/501.html");
     if (!file.is_open()) {
         perror("open error");
-        // std::exit(EXIT_FAILURE);
+        
     }
     std::string line;
     std::string content;
@@ -156,13 +160,17 @@ void HttpConnection::sendNotImplementedPage(SOCKET sockfd)
     sendToClient(sockfd, response);
 }
 
-void HttpConnection::sendTimeoutPage(SOCKET sockfd)
+void HttpConnection::sendTimeoutPage(progressInfo *obj)
 {
+    obj->pHandler = NULL;
+    std::cout << obj->socket << ": Status: Time out" << std::endl;
+    kill(SIGKILL, obj->childPid);
+
     // 504.htmlの内容を取得
     std::ifstream file("documents/504.html");
     if (!file.is_open()) {
         perror("open error");
-        // std::exit(EXIT_FAILURE);
+        
     }
     std::string line;
     std::string content;
@@ -175,14 +183,16 @@ void HttpConnection::sendTimeoutPage(SOCKET sockfd)
     std::string response;
     response = "HTTP/1.1 504 Gateway Timeout\n";
     response += "Server: webserv42tokyo\n";
-    response += "Date: " + getGmtDate() + "\n"; 
+    response += "Date: " + obj->httpConnection->getGmtDate() + "\n"; 
     response += "Content-Length: " + std::to_string(content.size()) + "\n";
     response += "Connection: Keep-Alive\n";
     response += "Content-Type: text/html\n";
     response += "\n";
     response += content;
 
-    sendToClient(sockfd, response);
+    obj->httpConnection->sendToClient(obj->socket, response);
+    obj->httpConnection->initProgressInfo(obj, obj->socket);
+    createNewEvent(obj->socket, EVFILT_READ, EV_ADD, 0, 0, obj);
 }
 
 void HttpConnection::sendInternalErrorPage(SOCKET sockfd)
@@ -191,7 +201,7 @@ void HttpConnection::sendInternalErrorPage(SOCKET sockfd)
     std::ifstream file("documents/500.html");
     if (!file.is_open()) {
         perror("open error");
-        // std::exit(EXIT_FAILURE);
+        
     }
     std::string line;
     std::string content;
@@ -226,10 +236,10 @@ void HttpConnection::executeCgi_postVersion(RequestParse& requestInfo, int pipe_
     std::string request_body = requestInfo.getBody();
     char* const cgi_argv[] = { const_cast<char*>(cgiPath.c_str()), const_cast<char*>(upload_dir.c_str()), const_cast<char*>(request_body.c_str()), NULL };
     if(execve(cgi_argv[0], cgi_argv, environ) < 0)
-        std::cout << "Error: execve() failed" << std::endl;
+        exit(1);
 }
 
-void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server)
+void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, progressInfo *obj)
 {
     std::string directory = "upload";
     // 一応、/upload/ディレクトリがちゃんと存在するか確認
@@ -253,14 +263,24 @@ void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, Virtu
             return ;
         }
     }
-
     int pipe_c2p[2];
     if(pipe(pipe_c2p) < 0)
         throw std::runtime_error("Error: pipe() failed");
+    obj->pipe_c2p[R] = pipe_c2p[R];
+    obj->pipe_c2p[W] = pipe_c2p[W];
+    obj->tHandler = sendTimeoutPage;
+    obj->pHandler = confirmExitStatusFromCgi;
     pid_t pid = fork();
-    if(pid == 0)
+    if(pid == 0){
         executeCgi_postVersion(requestInfo, pipe_c2p); // GETのcgiと主に違うのはこの関数
-    createResponseFromCgiOutput(pid, sockfd, pipe_c2p);
+    } else if(pid > 0) {
+        obj->childPid = pid;
+        createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
+        createNewEvent(obj->socket, EVFILT_TIMER, EV_ADD | EV_ONESHOT, 0, 10000, obj);
+        createNewEvent(pid, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, obj);
+    } else {
+        perror("fork() error");
+    }
 }
 
 void HttpConnection::deleteProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server)
@@ -286,7 +306,7 @@ void HttpConnection::deleteProcess(RequestParse& requestInfo, SOCKET sockfd, Vir
     if (std::remove(file_path.c_str()) != 0)
     {
         perror("remove error");
-        // std::exit(EXIT_FAILURE);
+        
     }
 
     std::string response;

@@ -1,4 +1,6 @@
-CPPS =  config/utils.cpp config/Config.cpp config/VirtualServer.cpp config/Location.cpp \
+CPPS =  config/utils.cpp \
+		config/Config.cpp \
+		config/VirtualServer.cpp config/Location.cpp \
 		request/RequestParse.cpp \
 		HttpConnection/HttpConnection.cpp \
 		HttpConnection/autoindex.cpp \
@@ -9,20 +11,22 @@ CPPS =  config/utils.cpp config/Config.cpp config/VirtualServer.cpp config/Locat
 OBJS = ${CPPS:.cpp=.o}
 
 NAME = webserv
-CGI = test1.cgi
-CGI2 = test2.cgi
+CGI = test.cgi
+CGI2 = time.cgi
+CGI3 = loop.cgi
 CGI_POST = upload.cgi
 CXX = c++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++98
 
 ifdef DEBUG
-CXXFLAGS += -g3
+CXXFLAGS += -fsanitize=address -g3 
 endif
 
 
-all: $(NAME) $(CGI) $(CGI2) $(CGI_POST)
+all: $(NAME) $(CGI) $(CGI2) $(CGI3) $(CGI_POST)
 	@mv $(CGI) cgi
 	@mv $(CGI2) cgi
+	@mv $(CGI3) cgi
 	@mv $(CGI_POST) cgi_post
 
 %.o: %.cpp
@@ -31,11 +35,14 @@ all: $(NAME) $(CGI) $(CGI2) $(CGI_POST)
 $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) -o $(NAME)
 
-$(CGI): cgi/test1.cpp
-	@$(CXX) $(CXXFLAGS) cgi/test1.cpp -o $(CGI)
+$(CGI): cgi/test.cpp
+	@$(CXX) $(CXXFLAGS) cgi/test.cpp -o $(CGI)
 
-$(CGI2): cgi/test2.cpp
-	@$(CXX) $(CXXFLAGS) cgi/test2.cpp -o $(CGI2)
+$(CGI2): cgi/time.cpp
+	@$(CXX) $(CXXFLAGS) cgi/time.cpp -o $(CGI2)
+
+$(CGI3): cgi/loop.cpp
+	@$(CXX) $(CXXFLAGS) cgi/loop.cpp -o $(CGI3)
 
 $(CGI_POST): cgi_post/upload.cpp
 	@$(CXX) $(CXXFLAGS) cgi_post/upload.cpp -o $(CGI_POST)
@@ -44,10 +51,11 @@ clean:
 	rm -rf $(OBJS) *.dSYM
 
 fclean: clean
-	rm -rf $(NAME) cgi/$(CGI) cgi/$(CGI2) cgi_post/$(CGI_POST)
+	rm -rf $(NAME) cgi/$(CGI) cgi/$(CGI2) cgi/$(CGI3) cgi_post/$(CGI_POST)
 
 re: fclean all;
-debug: fclean;
-	$(MAKE) DEBUG=1 all
+
+debug: fclean
+	make DEBUG=1 all
 
 .PHONY: all clean fclean re debug

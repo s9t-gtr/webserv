@@ -30,7 +30,7 @@ class RequestParse{
         void setHeaders(std::vector<std::string> linesVec, std::vector<std::string>::iterator& it);
         std::vector<std::string> splitLines(std::string str, char sep);
         void setBody(std::vector<std::string> linesVec, std::vector<std::string>::iterator itFromBody);
-        std::string createBodyStringFromLinesVector(std::vector<std::string> linesVec, std::vector<std::string>::iterator itFromBody);
+        std::string createBodyStringFromLinesVector(std::vector<std::string> linesVec);
         void bodyUnChunk(std::vector<std::string> linesVec, std::vector<std::string>::iterator itFromBody);
     private:
 

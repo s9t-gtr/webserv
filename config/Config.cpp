@@ -1,5 +1,4 @@
 #include "Config.hpp"
-
 /*========================================
         orthodox canonical form
 ========================================*/
@@ -25,8 +24,6 @@ Config* Config::getInstance(std::string configPath){
     try{
         inst = new Config(configPath);
         readConfig(inst);
-        // std::cout << ".conf file completed" << std::endl;
-        // std::cout << "----------------------------------------------" << std::endl;//出力結果をみやすく
     }catch(std::bad_alloc& e){
         std::cerr<< "Error: Failed new Config() " << std::endl;
         std::exit(EXIT_FAILURE); 
@@ -52,13 +49,11 @@ SOCKET tcpListen(std::string hostname, std::string port){
         struct addrinfo *result = NULL;
         SOCKET sockfd;
         
-        // createHints(hints, );
-        
         memset(&hints, 0, sizeof(hints));
         hints.ai_family = AF_INET6;
         hints.ai_socktype = SOCK_STREAM; // TCPソケット
         hints.ai_flags = AI_PASSIVE;
-        // std::cout << hostname << " : " << port << std::endl;
+        
         (void)hostname;
 
         int isError = getaddrinfo(NULL, port.c_str(), &hints, &result);//名前解決不可のため、第一引数はNULLに設定

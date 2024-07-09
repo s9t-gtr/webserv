@@ -40,7 +40,7 @@ static std::string getDisplayedDate(const struct dirent *entry, std::string path
     if (stat(path.c_str(), &path_stat) < 0)
     {
         perror("stat");
-        // std::exit(EXIT_FAILURE);
+        
     }
 
     char date_str[256];
@@ -59,7 +59,7 @@ static std::string getDisplayedSize(const struct dirent *entry, std::string path
     if (stat(path.c_str(), &path_stat) < 0)
     {
         perror("stat");
-        // std::exit(EXIT_FAILURE);
+        
     }
 
     std::stringstream ss;
@@ -77,7 +77,7 @@ static std::string getIndexList(std::string path, std::string path_fixed)
     DIR *dir = opendir(path_fixed.c_str());
     if (dir == NULL) {
         perror("opendir");
-        // std::exit(EXIT_FAILURE);
+        
     }
 
     struct dirent *entry;

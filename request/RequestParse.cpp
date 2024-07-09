@@ -3,13 +3,10 @@
 RequestParse::RequestParse(std::string requestMessage){
     setMethodPathVersion(requestMessage);
     setHeadersAndBody(requestMessage);
-    if (headers.find("Host") == headers.end()) {
+    if (headers.find("Host") == headers.end()) 
         throw std::runtime_error("Error: Missing required 'host' header");
-    }
     if (version != "HTTP/1.1")
-    {
         throw std::runtime_error("Error: Invalid version");
-    }
 }
 
 RequestParse::~RequestParse(){
@@ -90,13 +87,13 @@ void RequestParse::setHeaders(strVec linesVec, strVec::iterator& it){
 }
 
 void RequestParse::setBody(strVec  linesVec, strVec::iterator itFromBody) {
-    if((*itFromBody).size() == 0 || itFromBody == linesVec.end()){
+    if(headers.find("content_length") == headers.end()){
         body = "";
         return;
     }
     if(headers["Transfer-Encoding"] == "chunked")
         return bodyUnChunk(linesVec, itFromBody);
-    body = createBodyStringFromLinesVector(linesVec, itFromBody);
+    body = createBodyStringFromLinesVector(linesVec);
 }
 void RequestParse::bodyUnChunk(strVec linesVec, strVec::iterator itFromBody){
     /*
@@ -124,8 +121,7 @@ void RequestParse::bodyUnChunk(strVec linesVec, strVec::iterator itFromBody){
 //     return bodyString;
 // }
 
-std::string RequestParse::createBodyStringFromLinesVector(strVec linesVec, strVec::iterator itFromBody){
-    (void)itFromBody;//itFromBodyがエラーの原因かも？
+std::string RequestParse::createBodyStringFromLinesVector(strVec linesVec){
 
     // linesVecの先頭からみていく。改行が二回連続したら、それ以降をリクエストボディとして格納
 
