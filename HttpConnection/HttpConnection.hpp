@@ -83,7 +83,9 @@ class HttpConnection{
         void sendNotImplementedPage(SOCKET sockfd);
         void sendNotAllowedPage(SOCKET sockfd);
         void requestEntityPage(SOCKET sockfd);
-        std::string selectLocationSetting(std::map<std::string, Location*> &locations, std::string request_path);
+        std::string selectBestMatchLocation(std::map<std::string, Location*> &locations, std::string request_path);
+        Location* getLocationSetting(std::string path, VirtualServer *server, bool &allocFlag);
+
         bool isAllowedMethod(Location* location, std::string method);
         void sendInternalErrorPage(SOCKET sockfd);
         void sendBadRequestPage(SOCKET sockfd);

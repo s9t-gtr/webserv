@@ -174,8 +174,20 @@ void HttpConnection::sendCgiHandler(progressInfo *obj, Config *conf){
     createNewEvent(obj->socket, EVFILT_READ, EV_ADD, 0, 0, obj);
 }
 
+Location* HttpConnection::getLocationSetting(std::string path, VirtualServer *server, bool &allocFlag){
+    std::string location_path = selectBestMatchLocation(server->locations, path);
+    Location *locationPtr;
+    if(location_path != ""){
+        locationPtr = server->locations[location_path];
+    }else{
+        locationPtr = new Location("");
+        allocFlag = true;
+        locationPtr->confirmValuesLocation();
+    }
+    return locationPtr;
+}
 
-std::string HttpConnection::selectLocationSetting(std::map<std::string, Location*> &locations, std::string request_path)
+std::string HttpConnection::selectBestMatchLocation(std::map<std::string, Location*> &locations, std::string request_path)
 {
     std::string bestMatch = "";
     for (std::map<std::string, Location*>::const_iterator it = locations.begin(); it != locations.end(); ++it)
@@ -228,10 +240,9 @@ bool isCgi(RequestParse& requestInfo)
 void HttpConnection::sendResponse(Config *conf, RequestParse& requestInfo, SOCKET sockfd, progressInfo *obj){
     //今回指定されたバーチャルサーバーの設定情報を使いたいのでインスタンス化
     VirtualServer* server = conf->getServer(requestInfo.getHostName());
-
     //今回指定されたlocationパスの設定情報を使いたいのでインスタンス化
-    std::string location_path = selectLocationSetting(server->locations, requestInfo.getPath());
-    Location* location = server->locations[location_path];
+    bool allocFlag = false;
+    Location* location = getLocationSetting(requestInfo.getPath(), server, allocFlag);
 
     // std::cerr << "========" << location->path << "========" << std::endl;//デバッグ
 
@@ -311,7 +322,8 @@ void HttpConnection::sendResponse(Config *conf, RequestParse& requestInfo, SOCKE
     }
     else //GET,POST,DELETE以外の実装していないメソッド
         sendNotImplementedPage(sockfd);
-
+    if(allocFlag)
+        delete location;
 }
 
 
