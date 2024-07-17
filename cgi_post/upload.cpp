@@ -20,7 +20,8 @@ static std::string uploadFile(std::string upload_dir, std::string request_body)
     std::time_t t = std::time(NULL);
     struct tm *now = std::localtime(&t);
     char timestamp[20];
-    std::strftime(timestamp, sizeof(timestamp), "%Y%m%d%H%M%S", now);
+    // std::strftime(timestamp, sizeof(timestamp), "%Y%m%d%H%M%S", now);
+    std::strftime(timestamp, sizeof(timestamp), "%H%M%S", now);
 
     std::string file_path = upload_dir + timestamp;
 
@@ -38,8 +39,8 @@ static std::string uploadFile(std::string upload_dir, std::string request_body)
 // ファイルをアップロードしてからレスポンスをメインプロセスに返す
 int main(int argc, char** argv)
 {
-    (void)argc;
-
+    if(argc != 3)
+        exit(1);
     // execuveの引数から必要な情報を取得
     std::string upload_dir = argv[1];
     std::string request_body = argv[2];
