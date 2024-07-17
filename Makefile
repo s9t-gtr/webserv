@@ -8,13 +8,22 @@ CPPS =  config/utils.cpp \
 		HttpConnection/post_delete_utils.cpp \
 		main.cpp
 
-OBJS = ${CPPS:.cpp=.o}
+CGIS = cgi/test.cpp cgi/time.cpp cgi/loop.cpp 
+
+CGIS_POST = cgi_post/upload.cpp
+
+OBJS = $(CPPS:.cpp=.o)
 
 NAME = webserv
-CGI = test.cgi
-CGI2 = time.cgi
-CGI3 = loop.cgi
-CGI_POST = upload.cgi
+CGI_TARGETS := $(patsubst cgi/%.cpp,cgi/%.cgi,$(CGIS))
+CGI_POST_TARGETS := $(patsubst cgi_post/%.cpp,cgi_post/%.cgi,$(CGIS_POST))
+
+cgi/%.cgi: cgi/%.cpp
+	$(CXX) $(CXXFLAGS) $< -o $@
+cgi_post/%.cgi: cgi_post/%.cpp
+	$(CXX) $(CXXFLAGS) $< -o $@
+# CGI_DIR = cgi
+
 CXX = c++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++98
 
@@ -22,12 +31,7 @@ ifdef DEBUG
 CXXFLAGS += -fsanitize=address -g3 
 endif
 
-
-all: $(NAME) $(CGI) $(CGI2) $(CGI3) $(CGI_POST)
-	@mv $(CGI) cgi
-	@mv $(CGI2) cgi
-	@mv $(CGI3) cgi
-	@mv $(CGI_POST) cgi_post
+all: $(NAME) $(CGI_TARGETS) $(CGI_POST_TARGETS);
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
@@ -35,23 +39,13 @@ all: $(NAME) $(CGI) $(CGI2) $(CGI3) $(CGI_POST)
 $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) -o $(NAME)
 
-$(CGI): cgi/test.cpp
-	@$(CXX) $(CXXFLAGS) cgi/test.cpp -o $(CGI)
-
-$(CGI2): cgi/time.cpp
-	@$(CXX) $(CXXFLAGS) cgi/time.cpp -o $(CGI2)
-
-$(CGI3): cgi/loop.cpp
-	@$(CXX) $(CXXFLAGS) cgi/loop.cpp -o $(CGI3)
-
-$(CGI_POST): cgi_post/upload.cpp
-	@$(CXX) $(CXXFLAGS) cgi_post/upload.cpp -o $(CGI_POST)
-
 clean: 
 	rm -rf $(OBJS) *.dSYM
+	rm -f cgi/*.cgi
+	rm -f cgi_post/*.cgi
 
 fclean: clean
-	rm -rf $(NAME) cgi/$(CGI) cgi/$(CGI2) cgi/$(CGI3) cgi_post/$(CGI_POST)
+	rm -rf $(NAME)
 
 re: fclean all;
 
