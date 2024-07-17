@@ -20,14 +20,12 @@ static std::string uploadFile(std::string upload_dir, std::string request_body)
     std::time_t t = std::time(NULL);
     struct tm *now = std::localtime(&t);
     char timestamp[20];
-    // std::strftime(timestamp, sizeof(timestamp), "%Y%m%d%H%M%S", now);
     std::strftime(timestamp, sizeof(timestamp), "%H%M%S", now);
 
     std::string file_path = upload_dir + timestamp;
-
     std::ofstream file(file_path.c_str());
     if (!file.is_open()) {
-        perror("open error");
+        exit(1);
     }
 
     file << request_body;
@@ -44,17 +42,18 @@ int main(int argc, char** argv)
     // execuveの引数から必要な情報を取得
     std::string upload_dir = argv[1];
     std::string request_body = argv[2];
-
+    if(request_body.find("message=", 0) == 0)
+        request_body = request_body.substr(8);
     std::string timestamp = uploadFile(upload_dir, request_body);
-
+    upload_dir = "/" + upload_dir;
     std::string strOutData;
 
-    strOutData = "HTTP/1.1 201 Created\n";
+    strOutData = "HTTP/1.1 303 See Other\n";
     strOutData += "Connection: Keep-Alive\n";
     strOutData += "Content-Length: 0\n";
     strOutData += "Date: " + getGmtDate() + "\n";
     strOutData += "Server: webserv/1.0.0\n";
-    strOutData += "Location: " + upload_dir + timestamp + "\n";
+    strOutData += "Location: " + upload_dir + "\n";
     strOutData += "\n";
 
     std::cout << strOutData.c_str();
