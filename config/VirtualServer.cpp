@@ -1,5 +1,6 @@
 #include "VirtualServer.hpp"
-
+#include <fcntl.h>
+#include <unistd.h>
 
 /*========================================
         orthodox canonical form
@@ -111,6 +112,8 @@ void VirtualServer::confirmErrorPage(){
         throw std::runtime_error("Error: select 404"); //error_pageの設定は404のみに対応させる
     it++;
     std::string error_page_path = *it;
+    if(access(error_page_path.c_str(), F_OK | R_OK) != 0)
+        throw std::runtime_error("Error: error_page does not exist or permission denied");
     serverSetting["error_page"] = error_page_path;
     it++;
     if (it != status.end())
