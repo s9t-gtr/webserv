@@ -3,7 +3,7 @@
 void HttpConnection::sendBadRequestPage(SOCKET sockfd)
 {
     // 403.htmlの内容を取得
-    std::ifstream file("../documents/400.html");
+    std::ifstream file("documents/400.html");
     if (!file.is_open()) {
         perror("open error");
         
@@ -232,7 +232,7 @@ void HttpConnection::executeCgi_postVersion(RequestParse& requestInfo, int pipe_
     close(pipe_c2p[W]);
     extern char** environ;
     std::string cgiPath = "cgi_post/upload.cgi";
-    std::string upload_dir = requestInfo.getPath();
+    std::string upload_dir = UPLOAD;
     std::string request_body = requestInfo.getBody();
     char* const cgi_argv[] = { const_cast<char*>(cgiPath.c_str()), const_cast<char*>(upload_dir.c_str()), const_cast<char*>(request_body.c_str()), NULL };
     if(execve(cgi_argv[0], cgi_argv, environ) < 0)
@@ -286,8 +286,6 @@ void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, Virtu
 void HttpConnection::deleteProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server)
 {
     std::string file_path = requestInfo.getPath();
-    if(file_path[0] == '/')
-        file_path = file_path.substr(1);
 
     struct stat info;
     // 削除対象のファイル,ディレクトリの存在をチェック

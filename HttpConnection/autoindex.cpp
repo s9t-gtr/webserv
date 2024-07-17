@@ -72,9 +72,9 @@ static std::string getDisplayedSize(const struct dirent *entry, std::string path
 }
 
 // index_listの内容ごとに変える必要のある行を作成する関数
-static std::string getIndexList(std::string path, std::string path_fixed)
+static std::string getIndexList(std::string path)
 {
-    DIR *dir = opendir(path_fixed.c_str());
+    DIR *dir = opendir(path.c_str());
     if (dir == NULL) {
         perror("opendir");
         
@@ -87,9 +87,9 @@ static std::string getIndexList(std::string path, std::string path_fixed)
         if (entry->d_name[0] == '.')
             continue;
         index_list += "<tr>\n";
-        index_list += "<td align=\"left\" width=\"150\"><a href=\"" + path + encodeToHyperlink(entry) + "\">" + getDisplayedName(entry) + "</a></td>\n";
-        index_list += "<td align=\"center\" width=\"200\">" + getDisplayedDate(entry, path_fixed) + "</td>\n";
-        index_list += "<td align=\"center\" width=\"100\">" + getDisplayedSize(entry, path_fixed) + "</td>\n";
+        index_list += "<td align=\"left\" width=\"150\"><a href=\"" + encodeToHyperlink(entry) + "\">" + getDisplayedName(entry) + "</a></td>\n";
+        index_list += "<td align=\"center\" width=\"200\">" + getDisplayedDate(entry, path) + "</td>\n";
+        index_list += "<td align=\"center\" width=\"100\">" + getDisplayedSize(entry, path) + "</td>\n";
         index_list += "</tr>\n";
     }
     closedir(dir);
@@ -100,12 +100,9 @@ static std::string getIndexList(std::string path, std::string path_fixed)
 // AutoindexPageを作成して返す関数(autoindexディレクトリのexample.htmlを参考に作成した)
 void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location)
 {
-    std::string path_fixed = requestInfo.getPath();
-    if(path_fixed[0] == '/')
-        path_fixed = path_fixed.substr(1);
-
+    std::string path = requestInfo.getPath();
     struct stat info;
-    if (stat(path_fixed.c_str(), &info) != 0) {
+    if (stat(requestInfo.getPath().c_str(), &info) != 0) {
         // パスにアクセスできない場合
         return sendDefaultErrorPage(sockfd, server);
     } else if (info.st_mode & S_IFDIR) {
@@ -118,7 +115,7 @@ void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd,
 
     std::string content;
     content = "<html>\n";
-    content += "<head><title>Index of " + requestInfo.getPath() + "</title></head>\n";
+    content += "<head><title>Index of " + location->locationSetting["root"] + requestInfo.getPath() + "</title></head>\n";
     content += "<body>\n";
     content += "<h1>Index of " + requestInfo.getPath() + "</h1>\n";
     content += "<hr><table>\n";
@@ -130,7 +127,7 @@ void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd,
     content += "<tr>\n";
     content += "<td align=\"left\" width=\"150\"><a href=\"../\">../</a></td>\n";
     content += "</tr>\n";
-    content += getIndexList(requestInfo.getPath(), path_fixed);
+    content += getIndexList(requestInfo.getPath());
     content += "</table><hr>\n";
     content += "</body>\n";
     content += "</html>\n";

@@ -1,16 +1,20 @@
 #include "RequestParse.hpp"
 
-RequestParse::RequestParse(std::string requestMessage){
+RequestParse::RequestParse(std::string requestMessage, Config *conf): allocFlag(false){
     setMethodPathVersion(requestMessage);
     setHeadersAndBody(requestMessage);
     if (headers.find("Host") == headers.end()) 
         throw std::runtime_error("Error: Missing required 'host' header");
     if (version != "HTTP/1.1")
         throw std::runtime_error("Error: Invalid version");
+    setCorrespondServer(conf);
+    setCorrespondLocation();
+    createPathFromConfRoot();
 }
 
 RequestParse::~RequestParse(){
-
+    if(allocFlag)
+        delete location;
 }
 
 RequestParse::RequestParse(const RequestParse& other){
@@ -20,12 +24,14 @@ RequestParse::RequestParse(const RequestParse& other){
 
 RequestParse& RequestParse::operator=(const RequestParse& other){
     if(this != &other){
-    method = other.method;
-    path = other.path;
-    version = other.version;
-    headers = other.headers;
-    body = other.body;
-
+        method = other.method;
+        rawPath  = other.rawPath ;
+        version = other.version;
+        headers = other.headers;
+        server = other.server;
+        location = other.location;
+        allocFlag = other.allocFlag;
+        body = other.body;
         return *this;
     }
     return *this;
@@ -60,7 +66,7 @@ void RequestParse::setMethodPathVersion(std::string& requestMessage){
     if(splitFirstRow.size() != 3)
         throw std::runtime_error("Error: invalid request: non space in first line"); 
     method = splitFirstRow[0];
-    path = splitFirstRow[1];
+    rawPath = splitFirstRow[1];
     version = splitFirstRow[2];
 
 }
@@ -87,7 +93,7 @@ void RequestParse::setHeaders(strVec linesVec, strVec::iterator& it){
 }
 
 void RequestParse::setBody(strVec  linesVec, strVec::iterator itFromBody) {
-    if(headers.find("content_length") == headers.end()){
+    if(headers.find("Content-Length") == headers.end()){
         body = "";
         return;
     }
@@ -110,16 +116,6 @@ void RequestParse::bodyUnChunk(strVec linesVec, strVec::iterator itFromBody){
     }
     body = bodyString; 
 }
-// POSTメソッドでリクエストボディを追加するとこの関数でエラーになってしまう
-// std::string RequestParse::createBodyStringFromLinesVector(strVec linesVec, strVec::iterator itFromBody){
-//     std::string bodyString;
-//     for(strVec ::iterator it=itFromBody;it!=linesVec.end();it++){
-//         *it = *it+'\n';
-//         bodyString += *it;
-//     }
-//     bodyString.pop_back();
-//     return bodyString;
-// }
 
 std::string RequestParse::createBodyStringFromLinesVector(strVec linesVec){
 
@@ -144,12 +140,80 @@ std::string RequestParse::createBodyStringFromLinesVector(strVec linesVec){
     return bodyString;
 }
 
+Location* RequestParse::getLocationSetting(){
+    std::string location_path = selectBestMatchLocation(server->locations);
+    Location *locationPtr;
+    if(location_path != ""){
+        locationPtr = server->locations[location_path];
+    }else{
+        locationPtr = new Location("");
+        allocFlag = true;
+        locationPtr->confirmValuesLocation();
+    }
+    return locationPtr;
+}
+
+std::string RequestParse::selectBestMatchLocation(std::map<std::string, Location*> &locations)
+{
+    std::string bestMatch = "";
+    for (std::map<std::string, Location*>::const_iterator it = locations.begin(); it != locations.end(); ++it)
+    {
+        if (it->second->locationSetting.find("locationPath") != it->second->locationSetting.end())
+        {
+            const std::string &locationPath = it->second->locationSetting["locationPath"];
+            if (rawPath.substr(0, locationPath.size()) == locationPath)
+            {
+                if (locationPath.size() > bestMatch.size())
+                    bestMatch = locationPath;
+            }
+        }
+    }
+    return (bestMatch);
+}
+
+void RequestParse::setCorrespondServer(Config *conf){
+    server = conf->getServer(getHostName());
+}
+
+void RequestParse::setCorrespondLocation(){
+    location = getLocationSetting();
+}
+
+void RequestParse::createPathFromConfRoot(){
+    /*
+        「configのrootディレクティブで設定されたpath」と「request lineで指定されたpath」を連結する関数。
+        前提として「configのroot」の末尾には基本的に"/"が存在するが、configでrootが設定されていないときは空文字列になるという仕様になっている
+        example: [ root & req_path ]
+            [ "../" & "GET /cgi/ HTTP1.1" ]   -> "../cgi/"　(webservファイルからの相対パス)
+            [ ""  &  "GET /cgi/ HTTP1.1" ]    -> "cgi/"   (webservファイルからの相対パス)
+            [ "/"  &  "GET /cgi/ HTTP1.1" ]   -> "/cgi/" 
+            [ "/bin/" & "GET /cgi/ HTTP1.1" ] -> "/bin/cgi/" 
+        例外として
+            [ ""  &  "GET / HTTP1.1" ] -> "" のままだとstat()などでerrorになるので"./"とする
+    */
+    pathFromConfRoot = location->locationSetting["root"] + rawPath.substr(1);
+    if(pathFromConfRoot == "")
+        pathFromConfRoot = "./";
+}
+
 
 std::string RequestParse::getMethod(){
     return method;
 }
-std::string RequestParse::getPath(){
-    return path;
+std::string RequestParse::getRawPath (){
+    /*
+        request lineに含まれるpathそのままの文字列を返す関数。
+        example:
+            GET /cgi/ HTTP1.1 -> "/cgi/"
+            GET / HTTP1.1 -> "/"
+    */
+    return rawPath ;
+}
+std::string RequestParse::getPath (){
+    /*
+        「request lineに含まれるpath」と「configのroot」を連結したpathを返す関数。
+    */
+    return pathFromConfRoot;
 }
 std::string RequestParse::getVersion(){
     return version;
@@ -159,6 +223,12 @@ std::string RequestParse::getHeader(std::string header){
 }
 std::string RequestParse::getBody(){
     return body;
+}
+VirtualServer *RequestParse::getServer(){
+    return server;
+}
+Location *RequestParse::getLocation(){
+    return location;
 }
 void RequestParse::test__headers(){
     for(headersMap::iterator it=headers.begin();it!=headers.end();it++){

@@ -30,16 +30,6 @@ locationMap::iterator Location::getItEnd(){
 }
 
 void Location::setSetting(std::string directiveName, std::string directiveContent){
-
-
-
-    // std::cout << "----------------------------" << std::endl;
-    // std::cout << directiveContent << std::endl;
-    // std::cout << "----------------------------" << std::endl;
-
-
-
-
     if(locationSetting.find(directiveName) != locationSetting.end())
         throw std::runtime_error(directiveName+" is duplicate");
     locationSetting[directiveName] = directiveContent;
@@ -66,7 +56,18 @@ void Location::confirmIndex()
 void Location::confirmRoot()
 {
     if(locationSetting.find("root") == locationSetting.end())
-        setSetting("root", "documents/");
+        setSetting("root", "");
+    size_t len = locationSetting["root"].length();
+    if(0 < len && locationSetting["root"][len-1] != '/'){
+        /*
+            "document"や".."を指定された時に末尾に/をつける。
+            - request path.substr(1)と繋げる際にwebservパスからの相対パスを表現、rootに絶対パスを指定されても同じ連結方法でアクセスできる
+                root: "..", request path: "/cgi/"の時 ../ + cgi/
+                root: "/", request path: "/cgi/"の時  / + cgi/
+            - best match Locationを見つける時にはrequest path のgetRawPath()を使用する
+        */
+        locationSetting["root"] += "/";
+    }
 }
 
 void Location::confirmAllowMethod()
