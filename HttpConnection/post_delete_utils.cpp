@@ -71,8 +71,6 @@ void HttpConnection::sendForbiddenPage(SOCKET sockfd)
 
 void HttpConnection::sendNotAllowedPage(SOCKET sockfd)
 {
-    //std::cerr << "DEBUG: sendAllowMethod() in " << std::endl;
-
     // 403.htmlの内容を取得
     std::ifstream file("documents/405.html");
     if (!file.is_open()) {
@@ -98,7 +96,6 @@ void HttpConnection::sendNotAllowedPage(SOCKET sockfd)
     response += content;
 
     sendToClient(sockfd, response);
-    //std::cerr << "DEBUG: sendAllowMethod() out" << std::endl;
 
 }
 
@@ -201,7 +198,6 @@ void HttpConnection::sendInternalErrorPage(SOCKET sockfd)
     std::ifstream file("documents/500.html");
     if (!file.is_open()) {
         perror("open error");
-        
     }
     std::string line;
     std::string content;
@@ -231,8 +227,9 @@ void HttpConnection::executeCgi_postVersion(RequestParse& requestInfo, int pipe_
     dup2(pipe_c2p[W],1);
     close(pipe_c2p[W]);
     extern char** environ;
-    std::string cgiPath = "cgi_post/upload.cgi";
+    VirtualServer* server = requestInfo.getServer();
     std::string upload_dir = UPLOAD;
+    std::string cgiPath = server->getCgiPath();
     std::string request_body = requestInfo.getBody();
     char* const cgi_argv[] = { const_cast<char*>(cgiPath.c_str()), const_cast<char*>(upload_dir.c_str()), const_cast<char*>(request_body.c_str()), NULL };
     if(execve(cgi_argv[0], cgi_argv, environ) < 0)
@@ -263,6 +260,9 @@ void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, progr
             return ;
         }
     }
+    // VirtualServer* server = conf->getServer(requestInfo.getHostName());
+    std::string cgiPath = server->getCgiPath();
+
     int pipe_c2p[2];
     if(pipe(pipe_c2p) < 0)
         throw std::runtime_error("Error: pipe() failed");
@@ -309,7 +309,6 @@ void HttpConnection::deleteProcess(RequestParse& requestInfo, SOCKET sockfd, Vir
     std::string response;
     response = "HTTP/1.1 204 No Content\n";
     response += "Connection: Keep-Alive\n";
-    // response += "Content-Length: 0\n";
     response += "Date: " + getGmtDate() + "\n"; 
     response += "Server: webserv/1.0.0\n";
     response += "\n";//ヘッダーとボディを分けるために、ボディが空でも必要

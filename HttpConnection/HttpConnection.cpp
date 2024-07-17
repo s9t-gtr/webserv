@@ -235,9 +235,8 @@ bool isCgi(RequestParse& requestInfo)
         } else {
             return false;
         }
-    } else {
-        return false;
     }
+    return false;
 }
 
 void HttpConnection::sendResponse(RequestParse& requestInfo, SOCKET sockfd, progressInfo *obj){

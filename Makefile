@@ -10,7 +10,7 @@ CPPS =  config/utils.cpp \
 
 CGIS = cgi/test.cpp cgi/time.cpp cgi/loop.cpp 
 
-CGIS_POST = cgi_post/upload.cpp
+CGIS_POST = cgi_post/upload.cpp cgi_post/upload2.cpp 
 
 OBJS = $(CPPS:.cpp=.o)
 
@@ -22,7 +22,6 @@ cgi/%.cgi: cgi/%.cpp
 	$(CXX) $(CXXFLAGS) $< -o $@
 cgi_post/%.cgi: cgi_post/%.cpp
 	$(CXX) $(CXXFLAGS) $< -o $@
-# CGI_DIR = cgi
 
 CXX = c++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++98

@@ -124,9 +124,12 @@ void VirtualServer::confirmErrorPage(){
 std::string VirtualServer::getCgiPath(){
     return serverSetting["cgi_path"];
 }
+
 void VirtualServer::confirmCgi(){
     if(serverSetting.find("cgi_path") == serverSetting.end()){
-        setSetting("cgi_path", "cgi/default.cgi");
-        return ;
+        setSetting("cgi_path", "cgi_post/upload.cgi");
+    }
+    if(access(getCgiPath().c_str(), F_OK | X_OK) != 0){
+        throw std::runtime_error("Error: cgi_path does not exist or permission denied");
     }
 }
