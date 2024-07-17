@@ -1,22 +1,21 @@
 #include "HttpConnection.hpp"
 
 void HttpConnection::sendToClient(SOCKET sockfd, std::string response){
-    //std::cerr << "DEBUG: sendtoClient() in " << std::endl;
+    //std::cerr << "debug: sendtoClient()" << std::endl;
 
     int status = send(sockfd, response.c_str(), response.length(), 0);
     if (status == 0){
         // delete obj;
-        perror("send error1");
-        printf("errno = %d (%s)\n", errno, strerror(errno));
-        close(sockfd); //返り値が0のときは接続の失敗
-    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-    else if (status < 0){
-        // delete obj;
-        perror("send error2"); //返り値が-1のときはシステムコールの失敗
+        perror("send error: client connection close");
         printf("errno = %d (%s)\n", errno, strerror(errno));
         close(sockfd);
-    }else
-        std::cout << "send() success" << std::endl;
+    } 
+    else if (status < 0){
+        // delete obj;
+        perror("send error: failed systemcall"); 
+        printf("errno = %d (%s)\n", errno, strerror(errno));
+        close(sockfd);
+    }
 
 }
 
@@ -87,10 +86,7 @@ void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, Vi
     struct stat info;
     // 対象のファイル,ディレクトリの存在をチェックしつつ、infoに情報を読み込む
     if (stat(file_path.c_str(), &info) != 0)
-    {
-        sendDefaultErrorPage(sockfd, server);//404エラー
-        return ;
-    }
+        return sendDefaultErrorPage(sockfd, server);//404エラー
     // 対象がディレクトリであるか確認
     if (S_ISDIR(info.st_mode))
     {
@@ -98,23 +94,14 @@ void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, Vi
         if (location->locationSetting["index"] != "none")
             file_path = location->locationSetting["index"];
         else if (location->locationSetting["autoindex"] == "on")
-        {
-            sendAutoindexPage(requestInfo, sockfd, server, location);
-            return ;
-        }
+            return sendAutoindexPage(requestInfo, sockfd, server, location);
         else
-        {
-            sendForbiddenPage(sockfd);//403エラー
-            return ;
-        }
+            return sendForbiddenPage(sockfd);//403エラー
     }
 
     std::ifstream file(file_path);
-    if (!file.is_open()) {
-        sendDefaultErrorPage(sockfd, server);//404エラー <- std::exitのほうがいい？
-        return ;
-    }
-
+    if (!file.is_open())
+        return sendDefaultErrorPage(sockfd, server);//404エラー <- std::exitのほうがいい？
     std::string line;
     std::string content;
     while (std::getline(file, line)) {
@@ -132,17 +119,7 @@ void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, Vi
     response += "Content-Type: text/html\n";
     response += "\n";
     response += content;
-    int status = send(sockfd, response.c_str(), response.length(), 0);
-    if (status == 0){
-        // delete changelist[sockfd];
-        close(sockfd); //返り値が0のときは接続の失敗
-    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-    if (status < 0)
-    {
-        perror("send error"); //返り値が-1のときはシステムコールの失敗
-        // delete changelist[sockfd];
-        close(sockfd);
-    }
+    sendToClient(sockfd, response);
 }
 
 bool HttpConnection::checkCompleteRecieved(progressInfo obj){
@@ -154,19 +131,17 @@ bool HttpConnection::checkCompleteRecieved(progressInfo obj){
         if(target != std::string::npos){
             std::stringstream ss;
             ss << line.substr(target+15);
-            // std::cerr << "content_length : " << ss.str() << std::endl;
             ss >> obj.content_length;
-            // std::cerr << "obj.content_length: " << obj.content_length << std::endl;
         }
         head = tail + 1;
         tail = obj.buffer.find("\n", head);
     }
     if(isReadNewLine(obj.buffer) && obj.content_length == 0){
-        std::cerr << "Complete recieved" << std::endl;
+        // std::cerr << "debug: Complete recieved" << std::endl;
         return true; //get method && no body request
     }
     else if(isReadNewLine(obj.buffer) && bodyConfirm(obj)){
-        std::cerr << "Complete recieved" << std::endl;
+        // std::cerr << "debug: Complete recieved" << std::endl;
         return true; // already read body of request
     }
     return false;

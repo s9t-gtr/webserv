@@ -1,13 +1,10 @@
 #include "HttpConnection.hpp"
 
-void HttpConnection::sendBadRequestPage(SOCKET sockfd)
-{
-    // 403.htmlの内容を取得
-    std::ifstream file("documents/400.html");
-    if (!file.is_open()) {
+
+static std::string getStringFromHtml(std::string wantHtmlPath){
+    std::ifstream file(wantHtmlPath);
+    if (!file.is_open()) 
         perror("open error");
-        
-    }
     std::string line;
     std::string content;
     while (std::getline(file, line)) {
@@ -15,7 +12,12 @@ void HttpConnection::sendBadRequestPage(SOCKET sockfd)
         content += "\n";
     }
     file.close();
+    return content;
+}
 
+void HttpConnection::sendBadRequestPage(SOCKET sockfd)
+{
+    std::string content = getStringFromHtml("documents/400.html");
     std::string response;
     response = "HTTP/1.1 400 Bad Request\n";
     response += "Server: webserv42tokyo\n";
@@ -26,35 +28,12 @@ void HttpConnection::sendBadRequestPage(SOCKET sockfd)
     response += "\n";
     response += content;
 
-    int status = send(sockfd, response.c_str(), response.length(), 0);
-    if (status == 0){
-        // delete events[sockfd];
-        close(sockfd); //返り値が0のときは接続の失敗
-    } //read/recv/write/sendが失敗したら返り値を0と-1で分けて処理する。その後クライアントをremoveする。
-    if (status < 0)
-    {
-        perror("send error"); //返り値が-1のときはシステムコールの失敗
-        // delete events[sockfd];
-        close(sockfd);
-        
-    }
+    sendToClient(sockfd, response);
 }
 
 void HttpConnection::sendForbiddenPage(SOCKET sockfd)
 {
-    // 403.htmlの内容を取得
-    std::ifstream file("documents/403.html");
-    if (!file.is_open()) {
-        perror("open error");
-        
-    }
-    std::string line;
-    std::string content;
-    while (std::getline(file, line)) {
-        content += line;
-        content += "\n";
-    }
-    file.close();
+    std::string content = getStringFromHtml("documents/403.html");
 
     std::string response;
     response = "HTTP/1.1 403 Forbidden\n";
@@ -71,19 +50,7 @@ void HttpConnection::sendForbiddenPage(SOCKET sockfd)
 
 void HttpConnection::sendNotAllowedPage(SOCKET sockfd)
 {
-    // 403.htmlの内容を取得
-    std::ifstream file("documents/405.html");
-    if (!file.is_open()) {
-        perror("open error");
-        
-    }
-    std::string line;
-    std::string content;
-    while (std::getline(file, line)) {
-        content += line;
-        content += "\n";
-    }
-    file.close();
+    std::string content = getStringFromHtml("documents/405.html");
 
     std::string response;
     response = "HTTP/1.1 405 Method Not Allowed\n";
@@ -101,19 +68,7 @@ void HttpConnection::sendNotAllowedPage(SOCKET sockfd)
 
 void HttpConnection::requestEntityPage(SOCKET sockfd)
 {
-    // 403.htmlの内容を取得
-    std::ifstream file("documents/413.html");
-    if (!file.is_open()) {
-        perror("open error");
-        
-    }
-    std::string line;
-    std::string content;
-    while (std::getline(file, line)) {
-        content += line;
-        content += "\n";
-    }
-    file.close();
+    std::string content = getStringFromHtml("documents/413.html");
 
     std::string response;
     response = "HTTP/1.1 413 Request Entity Too Large\n";
@@ -130,19 +85,7 @@ void HttpConnection::requestEntityPage(SOCKET sockfd)
 
 void HttpConnection::sendNotImplementedPage(SOCKET sockfd)
 {
-    // 501.htmlの内容を取得
-    std::ifstream file("documents/501.html");
-    if (!file.is_open()) {
-        perror("open error");
-        
-    }
-    std::string line;
-    std::string content;
-    while (std::getline(file, line)) {
-        content += line;
-        content += "\n";
-    }
-    file.close();
+    std::string content = getStringFromHtml("documents/501.html");
 
     std::string response;
     response = "HTTP/1.1 501 Not Implemented\n";
@@ -160,23 +103,11 @@ void HttpConnection::sendNotImplementedPage(SOCKET sockfd)
 void HttpConnection::sendTimeoutPage(progressInfo *obj)
 {
     obj->pHandler = NULL;
-    std::cout << obj->socket << ": Status: Time out" << std::endl;
+    // std::cerr << "debug: Status: Time out : socket: " << obj->socket << std::endl;
     kill(SIGKILL, obj->childPid);
 
     // 504.htmlの内容を取得
-    std::ifstream file("documents/504.html");
-    if (!file.is_open()) {
-        perror("open error");
-        
-    }
-    std::string line;
-    std::string content;
-    while (std::getline(file, line)) {
-        content += line;
-        content += "\n";
-    }
-    file.close();
-
+    std::string content = getStringFromHtml("documents/504.html");
     std::string response;
     response = "HTTP/1.1 504 Gateway Timeout\n";
     response += "Server: webserv42tokyo\n";
@@ -194,18 +125,7 @@ void HttpConnection::sendTimeoutPage(progressInfo *obj)
 
 void HttpConnection::sendInternalErrorPage(SOCKET sockfd)
 {
-    // 504.htmlの内容を取得
-    std::ifstream file("documents/500.html");
-    if (!file.is_open()) {
-        perror("open error");
-    }
-    std::string line;
-    std::string content;
-    while (std::getline(file, line)) {
-        content += line;
-        content += "\n";
-    }
-    file.close();
+    std::string content = getStringFromHtml("documents/500.html");
 
     std::string response;
     response = "HTTP/1.1 500 Internal Server Error\n";
@@ -239,13 +159,9 @@ void HttpConnection::executeCgi_postVersion(RequestParse& requestInfo, int pipe_
 void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, progressInfo *obj)
 {
     std::string directory = UPLOAD;
-    // 一応、/upload/ディレクトリがちゃんと存在するか確認
     struct stat info;
     if (stat(directory.c_str(), &info) != 0 || !(info.st_mode & S_IFDIR))
-    {
-        sendForbiddenPage(sockfd);
-        return ;
-    }
+        return sendForbiddenPage(sockfd);
     VirtualServer* server = requestInfo.getServer();
     // もしclient_max_body_sizeが設定されていた場合
     if (server->serverSetting.find("client_max_body_size") != server->serverSetting.end())
@@ -255,14 +171,9 @@ void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, progr
         unsigned long number;
         iss >> number;
         if (request_body.size() > number)
-        {
-            requestEntityPage(sockfd);
-            return ;
-        }
+            return requestEntityPage(sockfd);
     }
-    // VirtualServer* server = conf->getServer(requestInfo.getHostName());
     std::string cgiPath = server->getCgiPath();
-
     int pipe_c2p[2];
     if(pipe(pipe_c2p) < 0)
         throw std::runtime_error("Error: pipe() failed");
@@ -287,24 +198,12 @@ void HttpConnection::deleteProcess(RequestParse& requestInfo, SOCKET sockfd, Vir
 {
     std::string file_path = requestInfo.getPath();
     struct stat info;
-    // 削除対象のファイル,ディレクトリの存在をチェック
-    if (stat(file_path.c_str(), &info) != 0)
-    {
-        sendDefaultErrorPage(sockfd, server);//404エラー
-        return ;
-    }
-    // 削除対象がディレクトリであるか確認
-    if (S_ISDIR(info.st_mode))
-    {
-        sendForbiddenPage(sockfd);//403エラー
-        return ;
-    }
-    // ファイルを削除
-    if (std::remove(file_path.c_str()) != 0)
-    {
+    if (stat(file_path.c_str(), &info) != 0)// 削除対象のファイル,ディレクトリの存在をチェック
+        return sendDefaultErrorPage(sockfd, server);//404エラー
+    if (S_ISDIR(info.st_mode))// 削除対象がディレクトリであるか確認
+        return sendForbiddenPage(sockfd);//403エラー
+    if (std::remove(file_path.c_str()) != 0)// ファイルを削除
         perror("remove error");
-        
-    }
 
     std::string response;
     response = "HTTP/1.1 204 No Content\n";

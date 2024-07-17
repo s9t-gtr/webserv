@@ -38,11 +38,7 @@ static std::string getDisplayedDate(const struct dirent *entry, std::string path
     path += entry->d_name;
     struct stat path_stat;
     if (stat(path.c_str(), &path_stat) < 0)
-    {
         perror("stat");
-        
-    }
-
     char date_str[256];
     struct tm *mtime = gmtime(&path_stat.st_mtimespec.tv_sec);
     strftime(date_str, 256, "%d-%b-%Y %H:%M", mtime);
@@ -57,11 +53,7 @@ static std::string getDisplayedSize(const struct dirent *entry, std::string path
     path += entry->d_name;
     struct stat path_stat;
     if (stat(path.c_str(), &path_stat) < 0)
-    {
         perror("stat");
-        
-    }
-
     std::stringstream ss;
     if (S_ISDIR(path_stat.st_mode))
         ss << "-";
@@ -75,10 +67,8 @@ static std::string getDisplayedSize(const struct dirent *entry, std::string path
 static std::string getIndexList(std::string path)
 {
     DIR *dir = opendir(path.c_str());
-    if (dir == NULL) {
+    if (dir == NULL)
         perror("opendir");
-        
-    }
     struct dirent *entry;
     std::string index_list = "";
     while ((entry = readdir(dir)) != NULL)
@@ -96,30 +86,14 @@ static std::string getIndexList(std::string path)
         index_list += "</tr>\n";
     }
     closedir(dir);
-
     return (index_list);
 }
 
-// AutoindexPageを作成して返す関数(autoindexディレクトリのexample.htmlを参考に作成した)
-void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location)
-{
-    std::string path = requestInfo.getPath();
-    struct stat info;
-    if (stat(requestInfo.getPath().c_str(), &info) != 0) {
-        // パスにアクセスできない場合
-        return sendDefaultErrorPage(sockfd, server);
-    } else if (info.st_mode & S_IFDIR) {
-        // パスがディレクトリである場合
-        ;
-    } else {
-        // パスがディレクトリではない場合(ファイルの時)
-        return sendStaticPage(requestInfo, sockfd, server, location);
-    }
-
+std::string HttpConnection::createAutoindexPage(RequestParse& requestInfo, std::string path){
     std::string content;
     content = "<html>\n";
     content += "<head>\n";
-    content += "<title>Index of " + location->locationSetting["root"] + requestInfo.getPath() + "</title>\n";
+    content += "<title>Index of " + requestInfo.getPath() + "</title>\n";
     if(path == UPLOAD){
         content += "<script>function deleteFile(fileName) {if(confirm(fileName + ' delete OK?')) {fetch(fileName, {method: 'DELETE',}).then(response => {if (response.ok) {alert('deleted'); location.reload();} else {alert('failed delete file'); } }) .catch(error => { console.error('Error:', error); alert('error');});}}</script>";
     }
@@ -149,6 +123,23 @@ void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd,
     response += "Content-Type: text/html\n";
     response += "\n";
     response += content;
-    // std::cout << response << std::endl;
-    sendToClient(sockfd, response);
+    return response;
+}
+
+// AutoindexPageを作成して返す関数(autoindexディレクトリのexample.htmlを参考に作成した)
+void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location)
+{
+    std::string path = requestInfo.getPath();
+    struct stat info;
+    if (stat(requestInfo.getPath().c_str(), &info) != 0) {
+        // パスにアクセスできない場合
+        return sendDefaultErrorPage(sockfd, server);
+    } else if (info.st_mode & S_IFDIR) {
+        // パスがディレクトリである場合
+        std::string response = createAutoindexPage(requestInfo, path);
+        sendToClient(sockfd, response);
+    } else {
+        // パスがディレクトリではない場合(ファイルの時)
+        return sendStaticPage(requestInfo, sockfd, server, location);
+    }
 }

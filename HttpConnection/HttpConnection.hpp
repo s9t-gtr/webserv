@@ -23,7 +23,6 @@ typedef struct progressInfo{
     std::string::size_type content_length;
     int pipe_c2p[2];
     SOCKET socket;
-    // int timeout;
     int exit_status;
     pid_t childPid;
     bool eofTimer; //true: on
@@ -33,7 +32,6 @@ typedef struct progressInfo{
 typedef struct timespec timespec;
 typedef std::map<int, struct kevent*> keventMap;
 
-// typedef std::map<int, progressInfo> progressInfoMap;
 
 #define W 1
 #define R 0
@@ -44,7 +42,6 @@ typedef std::map<int, struct kevent*> keventMap;
 class HttpConnection{
     private:
         static int kq;
-        // static progressInfoMap progressInfos;
         static struct kevent *eventlist;
         static timespec timeSpec;
     private:
@@ -65,13 +62,12 @@ class HttpConnection{
         static void eventRegister(struct kevent *changelist);
         void eventExecute(Config *conf, SOCKET sockefd, socketSet tcpSockets);
         void establishTcpConnection(SOCKET sockfd);
-        // bool isExistBuffer(SOCKET sockfd);
-        // void requestHandler(Config *conf, SOCKET sockfd);
         void sendResponse(RequestParse& requestInfo, SOCKET sockfd, progressInfo *obj);
         void executeCgi(RequestParse& requestInfo, int *pipe_c2p);
 
         void sendDefaultErrorPage(SOCKET sockfd, VirtualServer* server);
         void sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location);
+        std::string createAutoindexPage(RequestParse& requestInfo, std::string path);
         void sendToClient(SOCKET sockfd, std::string response);
         std::string getGmtDate();
         void sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location);

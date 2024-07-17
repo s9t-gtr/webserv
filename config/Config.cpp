@@ -43,7 +43,7 @@ void Config::readConfig(Config *inst){
 }
 
 
-SOCKET tcpListen(std::string hostname, std::string port){
+SOCKET tcpListen(std::string port){
 
         struct addrinfo hints;
         struct addrinfo *result = NULL;
@@ -53,15 +53,12 @@ SOCKET tcpListen(std::string hostname, std::string port){
         hints.ai_family = AF_INET6;
         hints.ai_socktype = SOCK_STREAM; // TCPソケット
         hints.ai_flags = AI_PASSIVE;
-        
-        (void)hostname;
 
         int isError = getaddrinfo(NULL, port.c_str(), &hints, &result);//名前解決不可のため、第一引数はNULLに設定
         if(isError != 0){
             std::cerr << gai_strerror(isError) << std::endl;
             throw std::runtime_error("Error: getaddrinfo(): failed");
         }
-        // std::cout << "create socket" << std::endl;; 
         struct addrinfo *ai = result;
         sockfd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
         if(sockfd == INVALID_SOCKET){
@@ -76,7 +73,6 @@ SOCKET tcpListen(std::string hostname, std::string port){
             close(sockfd);
             throw std::runtime_error("Error: setsockopt(): failed");
         }
-        // printf("set SO_REUSEADDR\n");
         if(bind(sockfd, ai->ai_addr, ai->ai_addrlen) < 0){
             std::cerr << "bind(): " << strerror(errno) << std::endl;
             freeaddrinfo(result);
@@ -95,9 +91,6 @@ SOCKET tcpListen(std::string hostname, std::string port){
             close(sockfd);
             throw std::runtime_error("Error: listen(): failed"); 
         }
-        // std::cout << "sockfd = " << sockfd << std::endl;
-        // printf("Listen succeeded\n"); 
-        // std::cout << "----------------------------------------------" << std::endl;
         return sockfd;
 }
 
@@ -109,7 +102,7 @@ socketSet Config::getTcpSockets(){
         // const char* hostname = tmpHostname != "" ? tmpHostname.c_str() : NULL;
         // tmpHostname = tmpHostname != "" ? tmpHostname : NULL; //std::stringにNULLを代入？->segv
         // const char* port = tmpPort.c_str();
-        SOCKET sockfd = tcpListen(tmpHostname, tmpPort);
+        SOCKET sockfd = tcpListen(tmpPort);
         set.insert(sockfd);
     }
     return set;
@@ -125,21 +118,16 @@ void Config::exploreHttpBlock(std::ifstream *ifs){
         std::getline(*ifs, line);
         switch(int index = getDirectiveType(line, isAppropriateDirectiveForBlock, httpDirectives_)){
             case INVALID_DIRECTIVE:
-                //std::cerr << "debug: " << line << " = invalid directive" << std::endl;
                 throw std::runtime_error("Error: "+line);
                 break;  
             case LOCATION_BLOCK:
-                //std::cerr << "debug: " << line << " = location block" << std::endl;
                 throw std::runtime_error("Error: "+line);
                 break;
             case SERVER_BLOCK:
-                //std::cerr << "debug: " << line << " = server block" << std::endl;
                 exploreServerBlock(ifs);
             case DIRECTIVE:
-                //std::cerr << "debug: " << line << " = directive" << std::endl;
                 break;
             case EMPTY:
-                //std::cerr << "debug: " << line << "空の行" << std::endl;
                 break;
             case ERROR:
                 throw std::runtime_error("Error: Invalid directive");
@@ -167,17 +155,13 @@ void Config::exploreServerBlock(std::ifstream *ifs){
         }
         switch(int index = getDirectiveType(line, isAppropriateDirectiveForBlock, serverDirectives_)){
             case INVALID_DIRECTIVE:
-                //std::cerr << "debug: " << line << " = invalid directive" << std::endl;
                 throw std::runtime_error("Error: "+line);
             case LOCATION_BLOCK:
-                //std::cerr << "debug: " << line << " = location block" << std::endl;
                 exploreLocationBlock(server, ifs, getDirectiveContentInLine(line, LOCATION_BLOCK));
                 break;
             case SERVER_BLOCK:
-                //std::cerr << "debug: " << line << " = server block" << std::endl;
                 throw std::runtime_error("Error: "+line); 
             case DIRECTIVE:
-                //std::cerr << "debug: " << line << " = directive" << std::endl;
                 line.pop_back();
                 server->setSetting(getDirectiveNameInLine(line), getDirectiveContentInLine(line, DIRECTIVE));
                 break;
@@ -194,11 +178,6 @@ void Config::exploreServerBlock(std::ifstream *ifs){
 
 
 void Config::exploreLocationBlock(VirtualServer *server, std::ifstream *ifs, std::string locationPath){
-
-    // std::cout << "----------------------------" << std::endl;
-    // std::cout << locationPath << std::endl;
-    // std::cout << "----------------------------" << std::endl;
-
     Location *location = new Location(locationPath);
     std::string line;
     bool isEndBrace = false;
@@ -212,17 +191,13 @@ void Config::exploreLocationBlock(VirtualServer *server, std::ifstream *ifs, std
         }
         switch(int index = getDirectiveType(line, isAppropriateDirectiveForBlock, locationDirectives_)){
             case INVALID_DIRECTIVE:
-                //std::cerr << "debug: " << line << " = invalid directive" << std::endl;
                 throw std::runtime_error("Error: "+line);
             case LOCATION_BLOCK:
-                //std::cerr << "debug: " << line << " = location block" << std::endl;
                 throw std::runtime_error("Error: "+line);
                 break;
             case SERVER_BLOCK:
-                //std::cerr << "debug: " << line << " = server block" << std::endl;
                 throw std::runtime_error("Error: "+line); 
             case DIRECTIVE:
-                //std::cerr << "debug: " << line << " = directive" << std::endl;
                 location->setSetting(getDirectiveNameInLine(line), getDirectiveContentInLine(line, LOCATION_DIRECTIVE));
                 break;
             case EMPTY:
@@ -240,24 +215,3 @@ void Config::exploreLocationBlock(VirtualServer *server, std::ifstream *ifs, std
 VirtualServer* Config::getServer(const std::string serverName){
     return (servers_[serverName]);
 }
-//utils -----------------------------------------------------------------------
-
-// bool Config::checkDupServerDirective(std::string directiveName, VirtualServer& server){
-//     if(server.searchSetting(directiveName) != server.getItEnd()){
-//         return STORE_OK;
-//     }
-//     return DUP;
-// }
-
-
-
-
-
-/*========================================
-        exception class
-========================================*/
-// const char* Config::std::exception::what() const throw(){
-//     std::string errorMessage = "Error : " + invalidLine_ + ": is Invalid";
-//     const char* c_message= errorMessage.c_str();
-//     return c_message;
-// }

@@ -1,6 +1,9 @@
 #include "utils.hpp"
 
-bool isEndBraceLine(std::string line){ //そのlineに"}"が一つだけならそれは何かのendBraceであるという保証
+bool isEndBraceLine(std::string line){ 
+    /*
+    そのlineに"}"が一つだけならそれは何かのendBraceであるという保証
+    */
     int endBrace = 0;
     for(size_t i=0;i<line.size();i++){
         if(line[i] == '}')
@@ -25,7 +28,6 @@ void cutPrefixSpace(std::string& line){
         i++;
     }
     line = line.substr(i);
-    // std::cout << "debug: cutPrefixSpace(): " << line << std::endl;
 }
 
 std::string getDirectiveNameInLine(std::string line){
@@ -37,7 +39,6 @@ std::string getDirectiveNameInLine(std::string line){
         if(line[i] == '{')
             break;
     }
-    // std::cout << "debug: getDirectiveNameInLine(): " << line.substr(0, i) << std::endl; 
     return line.substr(0, i);
 }
 
@@ -64,10 +65,9 @@ bool isLocationDirective(std::string line){
     if(line[len-1] != '{')
         return false;
     cutPrefixSpace(line);
-    // std::cout << line.substr(0, 9) << std::endl; //なぜか出力される”location”をなくす
     if(line.substr(0, 9) == "location "){
         std::string path = line.substr(10, len-1-10); 
-        while(path[i]){ //「正常なpathである＝pathがあるべき場所に１つの文字列が入っていること」とする。ここでそのpathが存在するものかのチェックをするかは迷いどころです
+        while(path[i]){ //「正常なpathである＝pathがあるべき場所に１つの文字列が入っていること」とする。
             if(path[i] == ' ' || path[i] == '\t')
                 return false;
             i++;

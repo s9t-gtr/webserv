@@ -24,9 +24,8 @@ static std::string uploadFile(std::string upload_dir, std::string request_body)
 
     std::string file_path = upload_dir + timestamp;
     std::ofstream file(file_path.c_str());
-    if (!file.is_open()) {
+    if (!file.is_open()) 
         exit(1);
-    }
 
     file << request_body + "____HELLO";
     file.close();
