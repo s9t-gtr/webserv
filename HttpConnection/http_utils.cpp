@@ -34,8 +34,6 @@ std::string HttpConnection::getGmtDate()
 // サーバーからのレスポンスとしてリダイレクトページを送る関数
 void HttpConnection::sendRedirectPage(SOCKET sockfd, Location* location)
 {
-    //std::cerr << "DEBUG: sendRedirectPage() in" << std::endl;
-
     std::string response;
     response = "HTTP/1.1 301 Moved Permanently\n";
     response += "Connection: Keep-Alive\n";
@@ -46,7 +44,6 @@ void HttpConnection::sendRedirectPage(SOCKET sockfd, Location* location)
     response += "\n";//ヘッダーとボディを分けるために、ボディが空でも必要
 
     sendToClient(sockfd, response);
-            //std::cerr << "DEBUG: sendRedirectPage() out" << std::endl;
 
 }
 
@@ -86,12 +83,7 @@ void HttpConnection::sendDefaultErrorPage(SOCKET sockfd, VirtualServer* server)
 // サーバーからのレスポンスとして静的ファイルを送る関数
 void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location)
 {
-    std::string file_path = location->locationSetting["root"] + requestInfo.getPath();
-    // std::cout << "========" << file_path << "========" << std::endl; //デバッグ
-    // もしパスが指定されていないときは、デフォルトのindex.htmlページを送る
-    if (requestInfo.getPath() == "/")
-        file_path = "documents/index.html";
-
+    std::string file_path = requestInfo.getPath();
     struct stat info;
     // 対象のファイル,ディレクトリの存在をチェックしつつ、infoに情報を読み込む
     if (stat(file_path.c_str(), &info) != 0)
@@ -107,7 +99,6 @@ void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, Vi
             file_path = location->locationSetting["index"];
         else if (location->locationSetting["autoindex"] == "on")
         {
-            std::cerr << "auto index" << std::endl;
             sendAutoindexPage(requestInfo, sockfd, server, location);
             return ;
         }
@@ -188,10 +179,13 @@ bool HttpConnection::isReadNewLine(std::string buffer){
 }
 
 bool HttpConnection::bodyConfirm(progressInfo info){
-    std::string::size_type newLineIdx = info.buffer.find("\n\r\n");
-    if(newLineIdx == std::string::npos)
+    size_t returnLen = std::strlen("\n\r\n");
+    std::string::size_type newLineIdx = info.buffer.find("\r\n");
+    if(newLineIdx == std::string::npos){
+        returnLen = std::strlen("\n");
         newLineIdx = info.buffer.find("\n\n");
-    std::string tmpBody = info.buffer.substr(newLineIdx+1);
+    }
+    std::string tmpBody = info.buffer.substr(newLineIdx+returnLen);
     if(tmpBody.size() == info.content_length)
         return true;
     return false;

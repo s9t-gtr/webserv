@@ -26,6 +26,7 @@ typedef struct progressInfo{
     // int timeout;
     int exit_status;
     pid_t childPid;
+    bool eofTimer; //true: on
 
 } progressInfo;
 
@@ -66,7 +67,7 @@ class HttpConnection{
         void establishTcpConnection(SOCKET sockfd);
         // bool isExistBuffer(SOCKET sockfd);
         // void requestHandler(Config *conf, SOCKET sockfd);
-        void sendResponse(Config *conf, RequestParse& requestInfo, SOCKET sockfd, progressInfo *obj);
+        void sendResponse(RequestParse& requestInfo, SOCKET sockfd, progressInfo *obj);
         void executeCgi(RequestParse& requestInfo, int *pipe_c2p);
 
         void sendDefaultErrorPage(SOCKET sockfd, VirtualServer* server);
@@ -83,8 +84,7 @@ class HttpConnection{
         void sendNotImplementedPage(SOCKET sockfd);
         void sendNotAllowedPage(SOCKET sockfd);
         void requestEntityPage(SOCKET sockfd);
-        std::string selectBestMatchLocation(std::map<std::string, Location*> &locations, std::string request_path);
-        Location* getLocationSetting(std::string path, VirtualServer *server, bool &allocFlag);
+
 
         bool isAllowedMethod(Location* location, std::string method);
         void sendInternalErrorPage(SOCKET sockfd);
@@ -96,6 +96,8 @@ class HttpConnection{
 
         void initProgressInfo(progressInfo *obj, SOCKET socket);
         static void recvHandler(progressInfo *obj);
+        static void recvEofTimerHandler(progressInfo *obj);
+
         static void sendHandler(progressInfo *obj, Config *conf);
         static void readCgiHandler(progressInfo *obj, Config *conf);
         static void sendCgiHandler(progressInfo *obj, Config *conf);
