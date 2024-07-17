@@ -40,9 +40,10 @@ $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) -o $(NAME)
 
 clean: 
-	rm -rf $(OBJS) *.dSYM
+	rm -rf $(OBJS) */*.dSYM
 	rm -f cgi/*.cgi
 	rm -f cgi_post/*.cgi
+	rm -f upload/*
 
 fclean: clean
 	rm -rf $(NAME)
