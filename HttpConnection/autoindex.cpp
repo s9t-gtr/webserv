@@ -79,7 +79,6 @@ static std::string getIndexList(std::string path)
         perror("opendir");
         
     }
-
     struct dirent *entry;
     std::string index_list = "";
     while ((entry = readdir(dir)) != NULL)
@@ -90,6 +89,10 @@ static std::string getIndexList(std::string path)
         index_list += "<td align=\"left\" width=\"150\"><a href=\"" + encodeToHyperlink(entry) + "\">" + getDisplayedName(entry) + "</a></td>\n";
         index_list += "<td align=\"center\" width=\"200\">" + getDisplayedDate(entry, path) + "</td>\n";
         index_list += "<td align=\"center\" width=\"100\">" + getDisplayedSize(entry, path) + "</td>\n";
+        if(path == UPLOAD){
+            index_list += "<td align=\"center\" width=\"100\">";
+            index_list += "<button onclick=\"deleteFile('" + getDisplayedName(entry) + "')\">delete</button>";
+        }
         index_list += "</tr>\n";
     }
     closedir(dir);
@@ -115,7 +118,12 @@ void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd,
 
     std::string content;
     content = "<html>\n";
-    content += "<head><title>Index of " + location->locationSetting["root"] + requestInfo.getPath() + "</title></head>\n";
+    content += "<head>\n";
+    content += "<title>Index of " + location->locationSetting["root"] + requestInfo.getPath() + "</title>\n";
+    if(path == UPLOAD){
+        content += "<script>function deleteFile(fileName) {if(confirm(fileName + ' delete OK?')) {fetch(fileName, {method: 'DELETE',}).then(response => {if (response.ok) {alert('deleted'); location.reload();} else {alert('failed delete file'); } }) .catch(error => { console.error('Error:', error); alert('error');});}}</script>";
+    }
+    content += "</head>\n";
     content += "<body>\n";
     content += "<h1>Index of " + requestInfo.getPath() + "</h1>\n";
     content += "<hr><table>\n";
