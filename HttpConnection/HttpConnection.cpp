@@ -243,6 +243,7 @@ bool isCgi(RequestParse& requestInfo)
 void HttpConnection::sendResponse(RequestParse& requestInfo, SOCKET sockfd, progressInfo *obj){
     VirtualServer *server = requestInfo.getServer();
     Location *location = requestInfo.getLocation();
+    std::string path = requestInfo.getPath();
     if (requestInfo.getMethod() == "GET")
     {
         // std::cerr << "DEBUG: GET()" << std::endl;
@@ -256,12 +257,9 @@ void HttpConnection::sendResponse(RequestParse& requestInfo, SOCKET sockfd, prog
         // redirec ->location設定の中で最優先
         if (location->locationSetting["return"] != "none")
             sendRedirectPage(sockfd, location);
-        //autoindex ->sendStaticPage関数内に移動
-        // else if (requestInfo.getPath().substr(0, 11) == "/autoindex/")
-        //     sendAutoindexPage(requestInfo, sockfd, server, location);
+        //autoindex ->sendStaticPage関数内
         else if (isCgi(requestInfo))//<- .cgi実行ファイルもMakefileで作成・削除できるようにする
         {
-            std::string path = requestInfo.getPath();
             if (access(path.c_str(), F_OK) != 0)
                 return sendDefaultErrorPage(sockfd, server);
             if (access(path.c_str(), X_OK))
@@ -300,8 +298,11 @@ void HttpConnection::sendResponse(RequestParse& requestInfo, SOCKET sockfd, prog
             sendNotAllowedPage(sockfd);
             return ;
         }
-        if (requestInfo.getRawPath() == UPLOAD)// リクエストパスがアップロード可能なディレクトリならファイルの作成
-            postProcess(requestInfo, sockfd, server, obj);
+        // if (path == UPLOAD)// リクエストパスがアップロード可能なディレクトリならファイルの作成
+        //     postProcess(requestInfo, sockfd, obj);
+        else if(isCgi(requestInfo)){
+            postProcess(requestInfo, sockfd, obj);
+        }
         else//メソッドがPOSTなのにリクエストパスが"/upload/"以外の場合
             sendForbiddenPage(sockfd);
     }
@@ -313,7 +314,7 @@ void HttpConnection::sendResponse(RequestParse& requestInfo, SOCKET sockfd, prog
             sendNotAllowedPage(sockfd);
             return ;
         }
-        if (requestInfo.getPath().substr(0, 8) == UPLOAD)// リクエストパスがアップロード可能なディレクトリならファイルの削除
+        if (path.substr(0, 7) == UPLOAD)// リクエストパスがアップロード可能なディレクトリならファイルの削除
             deleteProcess(requestInfo, sockfd, server);
         else//メソッドがDELETEなのにリクエストパスが"/upload/"以外の場合
             sendForbiddenPage(sockfd);

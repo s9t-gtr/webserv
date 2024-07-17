@@ -39,7 +39,7 @@ typedef std::map<int, struct kevent*> keventMap;
 #define R 0
 // #define TIMEOUT 10000
 #define MAX_BUF_LENGTH 64
-#define UPLOAD "/upload/"
+#define UPLOAD "upload/"
 
 class HttpConnection{
     private:
@@ -77,7 +77,7 @@ class HttpConnection{
         void sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location);
         void createResponse(std::string statusLine, std::string content);
         void sendRedirectPage(SOCKET sockfd, Location* location);
-        void postProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, progressInfo *obj);
+        void postProcess(RequestParse& requestInfo, SOCKET sockfd, progressInfo *obj);
         void executeCgi_postVersion(RequestParse& requestInfo, int pipe_c2p[2]);
         void sendForbiddenPage(SOCKET sockfd);
         void deleteProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server);

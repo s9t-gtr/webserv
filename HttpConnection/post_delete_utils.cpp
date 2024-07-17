@@ -239,9 +239,9 @@ void HttpConnection::executeCgi_postVersion(RequestParse& requestInfo, int pipe_
         exit(1);
 }
 
-void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, progressInfo *obj)
+void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, progressInfo *obj)
 {
-    std::string directory = "upload";
+    std::string directory = UPLOAD;
     // 一応、/upload/ディレクトリがちゃんと存在するか確認
     struct stat info;
     if (stat(directory.c_str(), &info) != 0 || !(info.st_mode & S_IFDIR))
@@ -249,7 +249,7 @@ void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, Virtu
         sendForbiddenPage(sockfd);
         return ;
     }
-
+    VirtualServer* server = requestInfo.getServer();
     // もしclient_max_body_sizeが設定されていた場合
     if (server->serverSetting.find("client_max_body_size") != server->serverSetting.end())
     {
@@ -286,7 +286,6 @@ void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, Virtu
 void HttpConnection::deleteProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server)
 {
     std::string file_path = requestInfo.getPath();
-
     struct stat info;
     // 削除対象のファイル,ディレクトリの存在をチェック
     if (stat(file_path.c_str(), &info) != 0)
