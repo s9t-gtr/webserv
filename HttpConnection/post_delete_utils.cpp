@@ -103,7 +103,7 @@ void HttpConnection::sendNotImplementedPage(SOCKET sockfd)
 void HttpConnection::sendTimeoutPage(progressInfo *obj)
 {
     obj->pHandler = NULL;
-    // std::cerr << "debug: Status: Time out : socket: " << obj->socket << std::endl;
+    // std::cerr << DEBUG << CYAN BOLD<< "Status: Time out : socket: " << obj->socket << RESET << std::endl;
     kill(SIGKILL, obj->childPid);
 
     // 504.htmlの内容を取得

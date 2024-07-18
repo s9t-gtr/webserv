@@ -1,7 +1,7 @@
 #include "HttpConnection.hpp"
 
 void HttpConnection::sendToClient(SOCKET sockfd, std::string response){
-    //std::cerr << "debug: sendtoClient()" << std::endl;
+    // std::cerr << DEBUG << "sendtoClient()" << std::endl;
 
     int status = send(sockfd, response.c_str(), response.length(), 0);
     if (status == 0){
@@ -137,11 +137,11 @@ bool HttpConnection::checkCompleteRecieved(progressInfo obj){
         tail = obj.buffer.find("\n", head);
     }
     if(isReadNewLine(obj.buffer) && obj.content_length == 0){
-        // std::cerr << "debug: Complete recieved" << std::endl;
+        // std::cerr << DEBUG << "Complete recieved" << std::endl;
         return true; //get method && no body request
     }
     else if(isReadNewLine(obj.buffer) && bodyConfirm(obj)){
-        // std::cerr << "debug: Complete recieved" << std::endl;
+        // std::cerr << DEBUG << "Complete recieved" << std::endl;
         return true; // already read body of request
     }
     return false;

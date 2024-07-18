@@ -56,8 +56,8 @@ void HttpConnection::startEventLoop(Config *conf){
     while(1){
         ssize_t nevent = kevent(kq, NULL, 0, eventlist, sizeof(*eventlist), &timeSpec);
         for(ssize_t i = 0; i<nevent;i++){
-            // std::cerr << "debug: <<<<<<<<<<<<<<< EVENT >>>>>>>>>>>>>>>" << std::endl;
-            // std::cerr << "debug: eventlist.ident: " << eventlist[i].ident << std::endl;
+            // std::cerr << DEBUG << BRIGHT_GREEN<< "<<<<<<<<<<<<<<< EVENT >>>>>>>>>>>>>>>" << RESET << std::endl;
+            // std::cerr << DEBUG << "ident(socket or pid or timer): " << eventlist[i].ident << std::endl;
 
             progressInfo *obj = (progressInfo *)eventlist[i].udata;
             if(obj == NULL)
@@ -75,7 +75,7 @@ void HttpConnection::startEventLoop(Config *conf){
 }
 
 void HttpConnection::establishTcpConnection(SOCKET sockfd){
-    // std::cerr << "debug: TCP CONNECTION ESTABLISHED: socket: " << sockfd << std::endl;
+    // std::cerr << DEBUG << "TCP CONNECTION ESTABLISHED " << std::endl;
 
     struct sockaddr_storage client_sa;
     socklen_t len = sizeof(client_sa);   
@@ -86,6 +86,7 @@ void HttpConnection::establishTcpConnection(SOCKET sockfd){
         printf("errno = %d (%s)\n", errno, strerror(errno));
         throw std::runtime_error("Error: accept() failed()");
     }
+    // std::cerr << DEBUG << "sokcet:" << sockfd << "create new socket: " << newSocket << std::endl;
     // int rcvbuf = 1;
     // len = sizeof(rcvbuf);
     // getsockopt(newSocket, SOL_SOCKET, SO_RCVBUF, &rcvbuf, &len);
@@ -112,13 +113,13 @@ void HttpConnection::initProgressInfo(progressInfo *obj, SOCKET socket){
 }
 
 void HttpConnection::recvHandler(progressInfo *obj){
-    // std::cerr << "debug: Status: Recv" << std::endl;
+    // std::cerr << DEBUG << BRIGHT_MAGENTA BOLD << "Status: Recv" << RESET << std::endl;
     if(obj->eofTimer == true){
         createNewEvent(obj->socket, EVFILT_TIMER, EV_DELETE, 0, 3000, obj);//未起動だったものは消すことでtimer大量生成を防ぐ
     }
     char buf[MAX_BUF_LENGTH];
     int bytesReceived = recv(obj->socket, &buf, MAX_BUF_LENGTH, MSG_DONTWAIT);
-    // std::cerr << "debug: bytesReceived: " << bytesReceived << std::endl;
+    // std::cerr << DEBUG << "bytesReceived: " << bytesReceived << std::endl;
     if(0 < bytesReceived){
         obj->buffer += std::string(buf, buf+bytesReceived);
         if(obj->httpConnection->checkCompleteRecieved(*obj)){
@@ -140,24 +141,24 @@ void HttpConnection::recvHandler(progressInfo *obj){
 }
 
 void HttpConnection::recvEofTimerHandler(progressInfo *obj){
-    // std::cerr << "debug: Status: EofTimerHandler" << std::endl;
+    // std::cerr << DEBUG << ORANGE BOLD << "Status: EofTimerHandler" << std::endl;
     if(obj->eofTimer == true){//sendHandlerに遷移した場合は何もしない
         createNewEvent(obj->socket, EVFILT_READ, EV_DELETE, 0, 0, NULL);
         obj->httpConnection->sendBadRequestPage(obj->socket);
-        // std::cerr << "debug: ---- close: socket ----: " << obj->socket << std::endl;
+        // std::cerr << DEBUG << "---- close: socket ----: " << obj->socket << std::endl;
         close(obj->socket);
         delete obj;
     }
 }
 
 void HttpConnection::sendHandler(progressInfo *obj, Config *conf){
-    // std::cerr << "debug: Status: Send" << std::endl;
+    // std::cerr << DEBUG << LIGHT_BLUE BOLD <<  "Status: Send" << RESET << std::endl;
     try{
         RequestParse requestInfo(obj->buffer, conf);
         obj->httpConnection->sendResponse(requestInfo, obj->socket, obj);
     }catch(std::runtime_error){
         obj->httpConnection->sendBadRequestPage(obj->socket);
-        // std::cerr << "debug: ---- close: socket ----: " << obj->socket << std::endl;
+        // std::cerr << DEBUG << "---- close: socket ----: " << obj->socket << std::endl;
         close(obj->socket);
         delete obj;
         return ;
@@ -170,14 +171,14 @@ void HttpConnection::sendHandler(progressInfo *obj, Config *conf){
 }
 
 void HttpConnection::readCgiHandler(progressInfo *obj, Config *conf){
-    // std::cerr << "debug: Status: Read CGI" << std::endl;
+    // std::cerr << DEBUG << RED BOLD << "Status: Read CGI" << RESET << std::endl;
     (void)conf;
     char buf[MAX_BUF_LENGTH];
 
     ssize_t bytesReceived = read(obj->pipe_c2p[R], &buf, MAX_BUF_LENGTH);
     if(0 < bytesReceived){
         obj->buffer += std::string(buf, buf+bytesReceived);
-        // std::cerr << "debug: bytesReceived: " << bytesReceived << std::endl;
+        // std::cerr << DEBUG << "bytesReceived: " << bytesReceived << std::endl;
         if(obj->httpConnection->checkCompleteRecieved(*obj)){
             obj->wHandler = sendCgiHandler;
             close(obj->pipe_c2p[R]);
@@ -194,7 +195,7 @@ void HttpConnection::readCgiHandler(progressInfo *obj, Config *conf){
 
 void HttpConnection::sendCgiHandler(progressInfo *obj, Config *conf){
     (void)conf;
-    // std::cerr << "debug: Status: Send CGI" << std::endl;
+    // std::cerr << DEBUG << BLUE BOLD<< "Status: Send CGI" << RESET << std::endl;
     obj->httpConnection->sendToClient(obj->socket, obj->buffer);
     createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
     obj->httpConnection->initProgressInfo(obj, obj->socket);
@@ -312,7 +313,7 @@ void HttpConnection::executeCgi(RequestParse& requestInfo, int pipe_c2p[2]){
 
 void HttpConnection::confirmExitStatusFromCgi(progressInfo *obj){
     obj->tHandler = NULL;
-    // std::cerr << "debug: Status: Exit Cgi " << std::endl;
+    // std::cerr << DEBUG << PINK BOLD<< "Status: Exit Cgi " << RESET << std::endl;
     int status;
     waitpid(obj->childPid, &status, 0);
     close(obj->pipe_c2p[W]);

@@ -19,6 +19,23 @@
 #define INVALID_SOCKET -1 
 #define STORE_OK true;
 #define DUP false;
+#define DEBUG ""
+
+//colors
+#define LIGHT_GREEN "\033[1;32m"
+#define BRIGHT_GREEN "\033[92m"
+#define MAGENTA "\033[0;35m"
+#define BRIGHT_MAGENTA "\033[95m"
+#define RED "\033[0;31m"
+#define ORANGE "\033[38;5;208m"  // 256色モードでのオレンジ
+#define PINK "\033[38;5;205m" 
+#define LIGHT_BLUE "\033[1;34m"
+#define BLUE "\033[0;34m"
+#define CYAN "\033[36m"
+//format
+#define BOLD "\033[1m"
+#define UNDERLINE "\033[4m"
+#define RESET "\033[0m"
 
 typedef std::map<std::string, VirtualServer*> serversMap;
 typedef std::map<std::string, std::string> strMap;
