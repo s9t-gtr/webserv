@@ -62,6 +62,7 @@ class Config{
         socketSet getTcpSockets();
         VirtualServer* getServer(const std::string serverName);
     private:
+        static void CheckConfigStatus(std::string configPath);
         static void exploreHttpBlock(std::ifstream *ifs);
         static void exploreServerBlock(std::ifstream *ifs);
         static void exploreLocationBlock(VirtualServer *server, std::ifstream *ifs, std::string location);

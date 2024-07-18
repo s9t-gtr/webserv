@@ -1,4 +1,6 @@
 #include "Config.hpp"
+#include <sys/types.h>
+#include <sys/stat.h>
 /*========================================
         orthodox canonical form
 ========================================*/
@@ -34,12 +36,21 @@ Config* Config::getInstance(std::string configPath){
     return inst;
 }
 
+void Config::CheckConfigStatus(std::string configPath){
+    struct stat confStat;
+    if (stat(configPath.c_str(), &confStat) < 0)
+        perror("stat");
+    std::stringstream ss;
+    if (S_ISDIR(confStat.st_mode))
+        throw std::runtime_error("Error: nable to specify directory"); 
+}
+
 void Config::readConfig(Config *inst){
+    CheckConfigStatus(inst->configPath_);
     std::ifstream ifs(inst->configPath_);
     if(!ifs)
-        throw std::runtime_error(inst->configPath_ + " open failed"); 
+        throw std::runtime_error("Error: " + inst->configPath_ + " open failed"); 
     exploreHttpBlock(&ifs);
-    
 }
 
 
