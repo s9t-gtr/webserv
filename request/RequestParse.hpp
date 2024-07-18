@@ -24,6 +24,7 @@ class RequestParse{
         std::string getHeader(std::string header);
         std::string getBody();
         std::string getHostName();
+        std::string getPort();
         VirtualServer *getServer();
         Location *getLocation();
 

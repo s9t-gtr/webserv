@@ -16,6 +16,7 @@ class VirtualServer{
         serverMap serverSetting;
         locationsMap locations;
         bool isDefault ;
+        size_t index; //confの中で上から何番目
     public:
         VirtualServer();
         ~VirtualServer();

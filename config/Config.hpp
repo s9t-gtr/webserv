@@ -61,6 +61,7 @@ class Config{
         static void readConfig(Config *inst);
         socketSet getTcpSockets();
         VirtualServer* getServer(const std::string serverName);
+        serversMap getSamePortListenServers(std::string port, serversMap &map);
     private:
         static void CheckConfigStatus(std::string configPath);
         static void exploreHttpBlock(std::ifstream *ifs);

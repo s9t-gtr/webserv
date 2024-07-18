@@ -5,9 +5,9 @@
 /*========================================
         orthodox canonical form
 ========================================*/
-VirtualServer::VirtualServer(){}
+VirtualServer::VirtualServer():isDefault(false){}
 VirtualServer::~VirtualServer(){}
-VirtualServer::VirtualServer(const VirtualServer& other){
+VirtualServer::VirtualServer(const VirtualServer& other):isDefault(false){
     if(this != &other)
         *this = other;
 }

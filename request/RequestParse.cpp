@@ -169,8 +169,28 @@ std::string RequestParse::selectBestMatchLocation(std::map<std::string, Location
     return (bestMatch);
 }
 
+
 void RequestParse::setCorrespondServer(Config *conf){
     server = conf->getServer(getHostName());
+    if(!server){
+        //port一致サーバの列挙
+        serversMap servers;
+        conf->getSamePortListenServers(getPort(), servers);
+        //default_server確認
+        for(serversMap::iterator it = servers.begin();it != servers.end();it++){
+            if(it->second->isDefault){
+                server = it->second;
+                return ;
+            }
+        }
+        //default_serverがなければindexが若いもの
+        for(serversMap::iterator it = servers.begin();it != servers.end();it++){
+            if(it->second->index == 0){
+                server = it->second;
+                return ;
+            }
+        }
+    }
 }
 
 void RequestParse::setCorrespondLocation(){
@@ -281,6 +301,20 @@ std::string RequestParse::getHostName(){
     if(directive != ""){
         strVec spDirective = split(directive, ':');
         return spDirective.size() != 2 ? "localhost" : spDirective[0];
+    }
+    return "";
+}
+
+std::string RequestParse::getPort(){
+    std::string directive = getHeader("Host");
+    if(directive != ""){
+        strVec spDirective = split(directive, ':');
+        if(spDirective.size() == 2){
+            if(spDirective[1][spDirective[1].size()-1] == '\r'){
+                return spDirective[1].substr(0, spDirective[1].size()-1);;
+            }
+        }else //Host = localhostの時
+            return "80";
     }
     return "";
 }

@@ -10,7 +10,6 @@ Config::Config(){
 }
 Config::Config(std::string configPath){
     configPath_ = configPath;
-    servers_ = serversMap();
 }
 Config::~Config(){}
 
@@ -107,14 +106,15 @@ SOCKET tcpListen(std::string port){
 
 socketSet Config::getTcpSockets(){
     socketSet set;
+    std::set<std::string> registerPorts;
     for(serversMap::const_iterator it=servers_.begin();it != Config::servers_.end();it++){
         std::string tmpHostname = it->second->getServerName();
         std::string tmpPort = it->second->getListenPort();
-        // const char* hostname = tmpHostname != "" ? tmpHostname.c_str() : NULL;
-        // tmpHostname = tmpHostname != "" ? tmpHostname : NULL; //std::stringにNULLを代入？->segv
-        // const char* port = tmpPort.c_str();
-        SOCKET sockfd = tcpListen(tmpPort);
-        set.insert(sockfd);
+        if(registerPorts.find(tmpPort) == registerPorts.end()){
+            SOCKET sockfd = tcpListen(tmpPort);
+            set.insert(sockfd);
+        }
+        registerPorts.insert(tmpPort);
     }
     return set;
 }
@@ -149,6 +149,14 @@ void Config::exploreHttpBlock(std::ifstream *ifs){
 void Config::setServer(std::string serverName, VirtualServer *server){
     if(servers_.find(serverName) != servers_.end())
         throw std::runtime_error("server: "+serverName+" is duplicate");
+    //port重複のサーバーの個数を数えて上から何番目に書かれているかの番号を割り当てる
+    size_t index = 0;
+    for(serversMap::iterator it = servers_.begin();it != servers_.end();it++){
+        if(it->second->getListenPort() == server->getListenPort()){
+            index++;
+        }
+    }
+    server->index = index;
     servers_[serverName] = server;
 }
 
@@ -224,5 +232,15 @@ void Config::exploreLocationBlock(VirtualServer *server, std::ifstream *ifs, std
 
 
 VirtualServer* Config::getServer(const std::string serverName){
+    if(servers_.find(serverName) == servers_.end())
+        return NULL;
     return (servers_[serverName]);
+}
+
+serversMap Config::getSamePortListenServers(std::string port, serversMap &map){
+    for(serversMap::const_iterator it = servers_.begin(); it != servers_.end(); it++){
+        if(it->second->getListenPort() == port)
+            map[it->first] = it->second;
+    }
+    return map;
 }
