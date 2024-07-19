@@ -172,6 +172,8 @@ std::string RequestParse::selectBestMatchLocation(std::map<std::string, Location
 
 void RequestParse::setCorrespondServer(Config *conf){
     server = conf->getServer(getHostName());
+    if(server->getListenPort() != getPort())
+        server = NULL;
     if(!server){
         //port一致サーバの列挙
         serversMap servers;
