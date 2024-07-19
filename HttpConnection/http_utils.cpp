@@ -9,36 +9,44 @@ void HttpConnection::sendToClient(std::string response, progressInfo *obj, int k
     
     */
     // std::cerr << DEBUG << "sendtoClient()" << std::endl;
+    if((size_t)obj->sndbuf < response.length()){
+        obj->buffer = response.substr(obj->sndbuf);
+        obj->tmpKind = kind;
+        response = response.substr(0, obj->sndbuf);
+        obj->wHandler = sendLargeResponse;
+    }else
+        obj->buffer = "";
     int status = send(obj->socket, response.c_str(), response.length(), 0);
     if (status == 0){
         perror("send error: client connection close");
         kind = 2;
     } 
     else if (status < 0){
-        if(kind == SEND)//SENDの失敗による sendInternalErrorPage()送信時のsend()でも失敗したら
+        if(kind == SEND)//send()の失敗による kind=SENDときのsendInternalErrorPage()送信時のsend()でも失敗したら
             kind = BAD_REQ;
         else
             sendInternalErrorPage(obj, SEND); 
     }
-
-    if(kind == FORK){
-        close(obj->pipe_c2p[R]);
-        close(obj->pipe_c2p[W]);
-    }
-    if(kind == BAD_REQ){//bad_requestする時にはsocketとobjを消すのでinitもreadイベント生成も不要
-        // std::cerr << DEBUG << "---- close: socket ----: " << obj->socket << std::endl;
-        close(obj->socket);
-        delete obj;
-        obj = NULL;
-        return ;
-    }
-    if(kind != RECV){ //recvの時はinitだけすれば良い
-        if(kind != CGI_FAIL){ //writeをaddする前にsendInternalErrirに入るのでDELETEしない
-            createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
+    if(obj->buffer == ""){//largeResponse送信途中にobjをリセットしたくない
+        if(kind == FORK){
+            close(obj->pipe_c2p[R]);
+            close(obj->pipe_c2p[W]);
         }
-        createNewEvent(obj->socket, EVFILT_READ, EV_ADD, 0, 0, obj);
+        if(kind == BAD_REQ){//bad_requestする時にはsocketとobjを消すのでinitもreadイベント生成も不要
+            // std::cerr << DEBUG << "---- close: socket ----: " << obj->socket << std::endl;
+            close(obj->socket);
+            delete obj;
+            obj = NULL;
+            return ;
+        }
+        if(kind != RECV){ //recvの時はinitだけすれば良い
+            if(kind != CGI_FAIL){ //writeをaddする前にsendInternalErrirに入るのでDELETEしない
+                createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
+            }
+            createNewEvent(obj->socket, EVFILT_READ, EV_ADD, 0, 0, obj);
+        }
+        obj->httpConnection->initProgressInfo(obj, obj->socket, obj->sndbuf);
     }
-    obj->httpConnection->initProgressInfo(obj, obj->socket);
     
         
 }

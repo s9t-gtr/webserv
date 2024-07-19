@@ -26,6 +26,8 @@ typedef struct progressInfo{
     int exit_status;
     pid_t childPid;
     bool eofTimer; //true: on
+    int sndbuf;
+    int tmpKind;
 
 } progressInfo;
 
@@ -97,7 +99,7 @@ class HttpConnection{
         bool bodyConfirm(progressInfo info);
         bool checkCompleteRecieved(progressInfo info);
 
-        void initProgressInfo(progressInfo *obj, SOCKET socket);
+        void initProgressInfo(progressInfo *obj, SOCKET socket, int sndbuf);
         static void recvHandler(progressInfo *obj);
         static void recvEofTimerHandler(progressInfo *obj);
 
@@ -105,6 +107,7 @@ class HttpConnection{
         static void readCgiHandler(progressInfo *obj, Config *conf);
         static void sendCgiHandler(progressInfo *obj, Config *conf);
         static void sendTimeoutPage(progressInfo *obj);
+        static void sendLargeResponse(progressInfo *obj, Config *conf);
         static void confirmExitStatusFromCgi(progressInfo *obj);
 };
 

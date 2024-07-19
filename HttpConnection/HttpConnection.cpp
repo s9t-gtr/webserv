@@ -86,19 +86,25 @@ void HttpConnection::establishTcpConnection(SOCKET sockfd){
         printf("errno = %d (%s)\n", errno, strerror(errno));
         throw std::runtime_error("Error: accept() failed()");
     }
-    // std::cerr << DEBUG << "sokcet:" << sockfd << "create new socket: " << newSocket << std::endl;
-    // int rcvbuf = 1;
-    // len = sizeof(rcvbuf);
-    // getsockopt(newSocket, SOL_SOCKET, SO_RCVBUF, &rcvbuf, &len);
-    // std::cout << "rcvbuf: " << rcvbuf << std::endl;//NOTICE: これ以上の長さのレスポンスを返すためにSend()もloopすべきかも
-    // std::cerr << "create connection socket: " << newSocket << std::endl;
+    // std::cerr << DEBUG << "[sokcet:" << sockfd << "] create new socket: " << newSocket << std::endl;
+    
+    int sndbuf = 1;
+    len = sizeof(sndbuf);
+    getsockopt(newSocket, SOL_SOCKET, SO_SNDBUF, &sndbuf, &len);
+    // std::cerr << DEBUG << "sndbuf: " << sndbuf << std::endl;//NOTICE: これ以上の長さのレスポンスを返すためにSend()もloopすべきかも
+
+    int rcvbuf = 1;
+    len = sizeof(rcvbuf);
+    getsockopt(newSocket, SOL_SOCKET, SO_RCVBUF, &rcvbuf, &len);
+    // std::cerr << DEBUG << "rcvbuf: " << rcvbuf << std::endl;//NOTICE: これ以上の長さのレスポンスを返すためにSend()もloopすべきかも
+
     progressInfo *obj = new progressInfo();
     std::memset(obj, 0, sizeof(progressInfo));
-    initProgressInfo(obj, newSocket);
+    initProgressInfo(obj, newSocket, sndbuf);
     createNewEvent(newSocket, EVFILT_READ, EV_ADD, 0, 0, obj);
 }
 
-void HttpConnection::initProgressInfo(progressInfo *obj, SOCKET socket){
+void HttpConnection::initProgressInfo(progressInfo *obj, SOCKET socket, int sndbuf){
     obj->kq = kq;
     obj->buffer = "";
     obj->content_length = 0;
@@ -110,6 +116,8 @@ void HttpConnection::initProgressInfo(progressInfo *obj, SOCKET socket){
     obj->socket = socket;
     obj->exit_status = 0;
     obj->eofTimer = false;
+    obj->sndbuf = sndbuf;
+    obj->tmpKind = -1;
 }
 
 void HttpConnection::recvHandler(progressInfo *obj){
@@ -179,6 +187,12 @@ void HttpConnection::sendCgiHandler(progressInfo *obj, Config *conf){
     (void)conf;
     // std::cerr << DEBUG << BLUE BOLD<< "Status: Send CGI" << RESET << std::endl;
     obj->httpConnection->sendToClient(obj->buffer, obj, NORMAL);
+}
+
+void HttpConnection::sendLargeResponse(progressInfo *obj, Config *conf){
+    (void)conf;
+    // std::cerr << DEBUG << LIGHT_GREEN BOLD<< "Status: Large Response" << RESET << std::endl;
+    obj->httpConnection->sendToClient(obj->buffer, obj, obj->tmpKind);
 }
 
 
