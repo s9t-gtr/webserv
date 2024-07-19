@@ -129,18 +129,21 @@ void HttpConnection::recvHandler(progressInfo *obj){
     int bytesReceived = recv(obj->socket, &buf, MAX_BUF_LENGTH, MSG_DONTWAIT);
     // std::cerr << DEBUG << "bytesReceived: " << bytesReceived << std::endl;
     if(0 < bytesReceived){
-        obj->buffer += std::string(buf, buf+bytesReceived);
-        if(obj->httpConnection->checkCompleteRecieved(*obj)){
-            obj->wHandler = sendHandler;
-            obj->eofTimer = false;
-            obj->tHandler = NULL;
-            createNewEvent(obj->socket, EVFILT_READ, EV_DELETE, 0, 0, NULL);
-            createNewEvent(obj->socket, EVFILT_WRITE, EV_ADD, 0, 0, obj);
-        }else{
-            obj->eofTimer = true;
-            obj->tHandler = recvEofTimerHandler;
-            createNewEvent(obj->socket, EVFILT_TIMER, EV_ADD | EV_ONESHOT, 0, 3000, obj);
-        }
+        if(obj->buffer.size()+bytesReceived < obj->buffer.max_size()){
+            obj->buffer += std::string(buf, buf+bytesReceived);
+            if(obj->httpConnection->checkCompleteRecieved(*obj)){
+                obj->wHandler = sendHandler;
+                obj->eofTimer = false;
+                obj->tHandler = NULL;
+                createNewEvent(obj->socket, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+                createNewEvent(obj->socket, EVFILT_WRITE, EV_ADD, 0, 0, obj);
+            }else{
+                obj->eofTimer = true;
+                obj->tHandler = recvEofTimerHandler;
+                createNewEvent(obj->socket, EVFILT_TIMER, EV_ADD | EV_ONESHOT, 0, 3000, obj);
+            }
+        }else
+            obj->httpConnection->sendBadRequestPage(obj);
     }else if(bytesReceived == 0){
         // std::cerr << "close: socket: " << obj->socket << std::endl;
         close(obj->socket);
