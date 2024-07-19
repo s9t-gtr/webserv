@@ -15,7 +15,7 @@ static std::string getStringFromHtml(std::string wantHtmlPath){
     return content;
 }
 
-void HttpConnection::sendBadRequestPage(SOCKET sockfd)
+void HttpConnection::sendBadRequestPage(progressInfo *obj)
 {
     std::string content = getStringFromHtml("documents/400.html");
     std::string response;
@@ -28,10 +28,10 @@ void HttpConnection::sendBadRequestPage(SOCKET sockfd)
     response += "\n";
     response += content;
 
-    sendToClient(sockfd, response);
+    sendToClient(response, obj, BAD_REQ);
 }
 
-void HttpConnection::sendForbiddenPage(SOCKET sockfd)
+void HttpConnection::sendForbiddenPage(progressInfo *obj)
 {
     std::string content = getStringFromHtml("documents/403.html");
 
@@ -45,10 +45,10 @@ void HttpConnection::sendForbiddenPage(SOCKET sockfd)
     response += "\n";
     response += content;
 
-    sendToClient(sockfd, response);
+    sendToClient(response, obj, NORMAL);
 }
 
-void HttpConnection::sendNotAllowedPage(SOCKET sockfd)
+void HttpConnection::sendNotAllowedPage(progressInfo *obj)
 {
     std::string content = getStringFromHtml("documents/405.html");
 
@@ -62,11 +62,11 @@ void HttpConnection::sendNotAllowedPage(SOCKET sockfd)
     response += "\n";
     response += content;
 
-    sendToClient(sockfd, response);
+    sendToClient(response, obj, NORMAL);
 
 }
 
-void HttpConnection::requestEntityPage(SOCKET sockfd)
+void HttpConnection::requestEntityPage(progressInfo *obj)
 {
     std::string content = getStringFromHtml("documents/413.html");
 
@@ -80,10 +80,10 @@ void HttpConnection::requestEntityPage(SOCKET sockfd)
     response += "\n";
     response += content;
 
-    sendToClient(sockfd, response);
+    sendToClient(response, obj, NORMAL);
 }
 
-void HttpConnection::sendNotImplementedPage(SOCKET sockfd)
+void HttpConnection::sendNotImplementedPage(progressInfo *obj)
 {
     std::string content = getStringFromHtml("documents/501.html");
 
@@ -97,7 +97,7 @@ void HttpConnection::sendNotImplementedPage(SOCKET sockfd)
     response += "\n";
     response += content;
 
-    sendToClient(sockfd, response);
+    sendToClient(response, obj, NORMAL);
 }
 
 void HttpConnection::sendTimeoutPage(progressInfo *obj)
@@ -118,12 +118,10 @@ void HttpConnection::sendTimeoutPage(progressInfo *obj)
     response += "\n";
     response += content;
 
-    obj->httpConnection->sendToClient(obj->socket, response);
-    obj->httpConnection->initProgressInfo(obj, obj->socket);
-    createNewEvent(obj->socket, EVFILT_READ, EV_ADD, 0, 0, obj);
+    obj->httpConnection->sendToClient(response, obj, CGI_FAIL);
 }
 
-void HttpConnection::sendInternalErrorPage(SOCKET sockfd)
+void HttpConnection::sendInternalErrorPage(progressInfo *obj, int kind)
 {
     std::string content = getStringFromHtml("documents/500.html");
 
@@ -137,7 +135,7 @@ void HttpConnection::sendInternalErrorPage(SOCKET sockfd)
     response += "\n";
     response += content;
 
-    sendToClient(sockfd, response);
+    sendToClient(response, obj, kind);
 }
 
 // GETのcgi関数と違うのはPOSTメソッドで届いたクライアントからのリクエストボディをexecveの引数に渡すところ
@@ -156,12 +154,12 @@ void HttpConnection::executeCgi_postVersion(RequestParse& requestInfo, int pipe_
         exit(1);
 }
 
-void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, progressInfo *obj)
+void HttpConnection::postProcess(RequestParse& requestInfo, progressInfo *obj)
 {
     std::string directory = UPLOAD;
     struct stat info;
     if (stat(directory.c_str(), &info) != 0 || !(info.st_mode & S_IFDIR))
-        return sendForbiddenPage(sockfd);
+        return sendForbiddenPage(obj);
     VirtualServer* server = requestInfo.getServer();
     // もしclient_max_body_sizeが設定されていた場合
     if (server->serverSetting.find("client_max_body_size") != server->serverSetting.end())
@@ -171,7 +169,7 @@ void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, progr
         unsigned long number;
         iss >> number;
         if (request_body.size() > number)
-            return requestEntityPage(sockfd);
+            return requestEntityPage(obj);
     }
     std::string cgiPath = server->getCgiPath();
     int pipe_c2p[2];
@@ -189,19 +187,18 @@ void HttpConnection::postProcess(RequestParse& requestInfo, SOCKET sockfd, progr
         createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
         createNewEvent(obj->socket, EVFILT_TIMER, EV_ADD | EV_ONESHOT, 0, 10000, obj);
         createNewEvent(pid, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, obj);
-    } else {
-        perror("fork() error");
-    }
+    } else 
+        sendInternalErrorPage(obj, FORK);
 }
 
-void HttpConnection::deleteProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server)
+void HttpConnection::deleteProcess(RequestParse& requestInfo, progressInfo *obj)
 {
     std::string file_path = requestInfo.getPath();
     struct stat info;
     if (stat(file_path.c_str(), &info) != 0)// 削除対象のファイル,ディレクトリの存在をチェック
-        return sendDefaultErrorPage(sockfd, server);//404エラー
+        return sendDefaultErrorPage(requestInfo.getServer(), obj);//404エラー
     if (S_ISDIR(info.st_mode))// 削除対象がディレクトリであるか確認
-        return sendForbiddenPage(sockfd);//403エラー
+        return sendForbiddenPage(obj);//403エラー
     if (std::remove(file_path.c_str()) != 0)// ファイルを削除
         perror("remove error");
 
@@ -212,5 +209,5 @@ void HttpConnection::deleteProcess(RequestParse& requestInfo, SOCKET sockfd, Vir
     response += "Server: webserv/1.0.0\n";
     response += "\n";//ヘッダーとボディを分けるために、ボディが空でも必要
 
-    sendToClient(sockfd, response);
+    sendToClient(response, obj, NORMAL);
 }

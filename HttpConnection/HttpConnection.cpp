@@ -133,46 +133,34 @@ void HttpConnection::recvHandler(progressInfo *obj){
             obj->tHandler = recvEofTimerHandler;
             createNewEvent(obj->socket, EVFILT_TIMER, EV_ADD | EV_ONESHOT, 0, 3000, obj);
         }
-    }else{
+    }else if(bytesReceived == 0){
         // std::cerr << "close: socket: " << obj->socket << std::endl;
         close(obj->socket);
         delete obj;
-    }
+    }else
+        obj->httpConnection->sendInternalErrorPage(obj, RECV);
 }
 
 void HttpConnection::recvEofTimerHandler(progressInfo *obj){
     // std::cerr << DEBUG << ORANGE BOLD << "Status: EofTimerHandler" << std::endl;
     if(obj->eofTimer == true){//sendHandlerに遷移した場合は何もしない
-        createNewEvent(obj->socket, EVFILT_READ, EV_DELETE, 0, 0, NULL);
-        obj->httpConnection->sendBadRequestPage(obj->socket);
-        // std::cerr << DEBUG << "---- close: socket ----: " << obj->socket << std::endl;
-        close(obj->socket);
-        delete obj;
+        obj->httpConnection->sendBadRequestPage(obj);
     }
 }
 
 void HttpConnection::sendHandler(progressInfo *obj, Config *conf){
     // std::cerr << DEBUG << LIGHT_BLUE BOLD <<  "Status: Send" << RESET << std::endl;
     try{
-        RequestParse requestInfo(obj->buffer, conf);
-        obj->httpConnection->sendResponse(requestInfo, obj->socket, obj);
+        RequestParse requestInfo(obj->buffer, conf); //例外発生元はこれ
+        obj->httpConnection->sendResponse(requestInfo, obj);
     }catch(std::runtime_error){
-        obj->httpConnection->sendBadRequestPage(obj->socket);
-        // std::cerr << DEBUG << "---- close: socket ----: " << obj->socket << std::endl;
-        close(obj->socket);
-        delete obj;
-        return ;
-    }
-    if(obj->wHandler == sendHandler && obj->tHandler != sendTimeoutPage){
-        createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
-        obj->httpConnection->initProgressInfo(obj, obj->socket);
-        createNewEvent(obj->socket, EVFILT_READ, EV_ADD, 0, 0, obj);
+        return obj->httpConnection->sendBadRequestPage(obj);
     }
 }
 
 void HttpConnection::readCgiHandler(progressInfo *obj, Config *conf){
     // std::cerr << DEBUG << RED BOLD << "Status: Read CGI" << RESET << std::endl;
-    (void)conf;
+    (void)conf;//wHandlerのインターフェース的に必要
     char buf[MAX_BUF_LENGTH];
 
     ssize_t bytesReceived = read(obj->pipe_c2p[R], &buf, MAX_BUF_LENGTH);
@@ -183,23 +171,14 @@ void HttpConnection::readCgiHandler(progressInfo *obj, Config *conf){
             obj->wHandler = sendCgiHandler;
             close(obj->pipe_c2p[R]);
         }
-    }else{
-        perror("read error"); //返り値が-1のときはシステムコールの失敗
-        obj->httpConnection->sendInternalErrorPage(obj->socket);
-        obj->httpConnection->initProgressInfo(obj, obj->socket);
-        createNewEvent(obj->socket, EVFILT_READ, EV_ADD, 0, 0, obj);
-        createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
-
-    }
+    }else
+        obj->httpConnection->sendInternalErrorPage(obj, NORMAL);
 }
 
 void HttpConnection::sendCgiHandler(progressInfo *obj, Config *conf){
     (void)conf;
     // std::cerr << DEBUG << BLUE BOLD<< "Status: Send CGI" << RESET << std::endl;
-    obj->httpConnection->sendToClient(obj->socket, obj->buffer);
-    createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
-    obj->httpConnection->initProgressInfo(obj, obj->socket);
-    createNewEvent(obj->socket, EVFILT_READ, EV_ADD, 0, 0, obj);
+    obj->httpConnection->sendToClient(obj->buffer, obj, NORMAL);
 }
 
 
@@ -233,7 +212,7 @@ bool isCgi(RequestParse& requestInfo)
     return false;
 }
 
-void HttpConnection::sendResponse(RequestParse& requestInfo, SOCKET sockfd, progressInfo *obj){
+void HttpConnection::sendResponse(RequestParse& requestInfo, progressInfo *obj){
     VirtualServer *server = requestInfo.getServer();
     Location *location = requestInfo.getLocation();
     std::string path = requestInfo.getPath();
@@ -241,17 +220,17 @@ void HttpConnection::sendResponse(RequestParse& requestInfo, SOCKET sockfd, prog
     {
         // allow_methodが設定され、かつGETが含まれていなかった場合
         if (isAllowedMethod(location, "GET") == false)
-            return sendNotAllowedPage(sockfd);
+            return sendNotAllowedPage(obj);
         // redirec ->location設定の中で最優先
         if (location->locationSetting["return"] != "none")
-            sendRedirectPage(sockfd, location);
+            sendRedirectPage(location, obj);
         //autoindex ->sendStaticPage関数内
         else if (isCgi(requestInfo))//<- .cgi実行ファイルもMakefileで作成・削除できるようにする
         {
             if (access(path.c_str(), F_OK) != 0)
-                return sendDefaultErrorPage(sockfd, server);
+                return sendDefaultErrorPage(server, obj);
             if (access(path.c_str(), X_OK))
-                return sendForbiddenPage(sockfd);
+                return sendForbiddenPage(obj);
 
             int pipe_c2p[2];
             if(pipe(pipe_c2p) < 0)
@@ -268,34 +247,33 @@ void HttpConnection::sendResponse(RequestParse& requestInfo, SOCKET sockfd, prog
                 createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
                 createNewEvent(obj->socket, EVFILT_TIMER, EV_ADD | EV_ONESHOT, 0, 10000, obj);
                 createNewEvent(pid, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, obj);
-            } else {
-                perror("fork() error");
-            }
+            } else 
+                sendInternalErrorPage(obj, FORK);
         }
         //その他の静的ファイルまたはディレクトリ
         else
-            sendStaticPage(requestInfo, sockfd, server, location);
+            sendStaticPage(requestInfo, obj);
     }
     else if (requestInfo.getMethod() == "POST")
     {
         if (isAllowedMethod(location, "POST") == false)
-            return sendNotAllowedPage(sockfd);
+            return sendNotAllowedPage(obj);
         else if(isCgi(requestInfo))
-            postProcess(requestInfo, sockfd, obj);
+            postProcess(requestInfo, obj);
         else//メソッドがPOSTなのにリクエストパスがcgi以外の場合
-            sendForbiddenPage(sockfd);
+            sendForbiddenPage(obj);
     }
     else if (requestInfo.getMethod() == "DELETE")
     {
         if (isAllowedMethod(location, "DELETE") == false)
-            return sendNotAllowedPage(sockfd);
+            return sendNotAllowedPage(obj);
         if (path.substr(0, 7) == UPLOAD)// リクエストパスがアップロード可能なディレクトリならファイルの削除
-            deleteProcess(requestInfo, sockfd, server);
+            deleteProcess(requestInfo, obj);
         else//メソッドがDELETEなのにリクエストパスが"/upload/"以外の場合
-            sendForbiddenPage(sockfd);
+            sendForbiddenPage(obj);
     }
     else //GET,POST,DELETE以外の実装していないメソッド
-        sendNotImplementedPage(sockfd);
+        sendNotImplementedPage(obj);
 }
 
 
@@ -321,10 +299,6 @@ void HttpConnection::confirmExitStatusFromCgi(progressInfo *obj){
         obj->buffer = "";
         obj->wHandler = readCgiHandler;
         createNewEvent(obj->socket, EVFILT_WRITE, EV_ADD, 0, 0, obj);
-    } else if(WEXITSTATUS(status) == 1){
-        obj->buffer = "";
-        obj->wHandler = readCgiHandler;
-        createNewEvent(obj->socket, EVFILT_WRITE, EV_ADD, 0, 0, obj);
-    } else 
-        obj->httpConnection->sendInternalErrorPage(obj->socket);
+    } else
+        obj->httpConnection->sendInternalErrorPage(obj, CGI_FAIL);
 }

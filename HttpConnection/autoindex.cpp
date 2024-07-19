@@ -127,19 +127,19 @@ std::string HttpConnection::createAutoindexPage(RequestParse& requestInfo, std::
 }
 
 // AutoindexPageを作成して返す関数(autoindexディレクトリのexample.htmlを参考に作成した)
-void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location)
+void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, progressInfo *obj)
 {
     std::string path = requestInfo.getPath();
     struct stat info;
     if (stat(requestInfo.getPath().c_str(), &info) != 0) {
         // パスにアクセスできない場合
-        return sendDefaultErrorPage(sockfd, server);
+        return sendDefaultErrorPage(requestInfo.getServer(), obj);
     } else if (info.st_mode & S_IFDIR) {
         // パスがディレクトリである場合
         std::string response = createAutoindexPage(requestInfo, path);
-        sendToClient(sockfd, response);
+        sendToClient(response, obj, NORMAL);
     } else {
         // パスがディレクトリではない場合(ファイルの時)
-        return sendStaticPage(requestInfo, sockfd, server, location);
+        return sendStaticPage(requestInfo, obj);
     }
 }

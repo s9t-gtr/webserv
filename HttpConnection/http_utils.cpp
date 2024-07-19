@@ -1,22 +1,46 @@
 #include "HttpConnection.hpp"
 
-void HttpConnection::sendToClient(SOCKET sockfd, std::string response){
+void HttpConnection::sendToClient(std::string response, progressInfo *obj, int kind){
+    /*
+        kind: 
+            normal: 0 - 通信は切断しないしwriteイベントもまだ削除していない
+            cgi: 1 - cgi実行時にWRITEイベントは削除するため分岐が必要
+            bad_request: 2 - objをdeleteしつつsocketもcloseするので分岐が必要
+    
+    */
     // std::cerr << DEBUG << "sendtoClient()" << std::endl;
-
-    int status = send(sockfd, response.c_str(), response.length(), 0);
+    int status = send(obj->socket, response.c_str(), response.length(), 0);
     if (status == 0){
-        // delete obj;
         perror("send error: client connection close");
-        printf("errno = %d (%s)\n", errno, strerror(errno));
-        close(sockfd);
+        kind = 2;
     } 
     else if (status < 0){
-        // delete obj;
-        perror("send error: failed systemcall"); 
-        printf("errno = %d (%s)\n", errno, strerror(errno));
-        close(sockfd);
+        if(kind == SEND)//SENDの失敗による sendInternalErrorPage()送信時のsend()でも失敗したら
+            kind = BAD_REQ;
+        else
+            sendInternalErrorPage(obj, SEND); 
     }
 
+    if(kind == FORK){
+        close(obj->pipe_c2p[R]);
+        close(obj->pipe_c2p[W]);
+    }
+    if(kind == BAD_REQ){//bad_requestする時にはsocketとobjを消すのでinitもreadイベント生成も不要
+        // std::cerr << DEBUG << "---- close: socket ----: " << obj->socket << std::endl;
+        close(obj->socket);
+        delete obj;
+        obj = NULL;
+        return ;
+    }
+    if(kind != RECV){ //recvの時はinitだけすれば良い
+        if(kind != CGI_FAIL){ //writeをaddする前にsendInternalErrirに入るのでDELETEしない
+            createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
+        }
+        createNewEvent(obj->socket, EVFILT_READ, EV_ADD, 0, 0, obj);
+    }
+    obj->httpConnection->initProgressInfo(obj, obj->socket);
+    
+        
 }
 
 // サーバーからのレスポンスヘッダーに含まれるGMT時刻を取得する関数
@@ -31,7 +55,7 @@ std::string HttpConnection::getGmtDate()
 }
 
 // サーバーからのレスポンスとしてリダイレクトページを送る関数
-void HttpConnection::sendRedirectPage(SOCKET sockfd, Location* location)
+void HttpConnection::sendRedirectPage(Location* location, progressInfo *obj)
 {
     std::string response;
     response = "HTTP/1.1 301 Moved Permanently\n";
@@ -42,12 +66,12 @@ void HttpConnection::sendRedirectPage(SOCKET sockfd, Location* location)
     response += "Location: " + location->locationSetting["return"] + "\n";
     response += "\n";//ヘッダーとボディを分けるために、ボディが空でも必要
 
-    sendToClient(sockfd, response);
+    sendToClient(response, obj, NORMAL);
 
 }
 
 // サーバーからのレスポンスとしてデフォルトのエラーページを送る関数
-void HttpConnection::sendDefaultErrorPage(SOCKET sockfd, VirtualServer* server)
+void HttpConnection::sendDefaultErrorPage(VirtualServer* server, progressInfo *obj)
 {
     std::string error_page_path = server->serverSetting["error_page"];
     // デフォルトのエラーページの内容を取得
@@ -76,17 +100,19 @@ void HttpConnection::sendDefaultErrorPage(SOCKET sockfd, VirtualServer* server)
     response += "\n";
     response += content;
 
-    sendToClient(sockfd, response);
+    sendToClient(response, obj, NORMAL);
 }
 
 // サーバーからのレスポンスとして静的ファイルを送る関数
-void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location)
+void HttpConnection::sendStaticPage(RequestParse& requestInfo, progressInfo *obj)
 {
     std::string file_path = requestInfo.getPath();
+    Location *location = requestInfo.getLocation();
+    VirtualServer *server = requestInfo.getServer();
     struct stat info;
     // 対象のファイル,ディレクトリの存在をチェックしつつ、infoに情報を読み込む
     if (stat(file_path.c_str(), &info) != 0)
-        return sendDefaultErrorPage(sockfd, server);//404エラー
+        return sendDefaultErrorPage(requestInfo.getServer(),  obj);//404エラー
     // 対象がディレクトリであるか確認
     if (S_ISDIR(info.st_mode))
     {
@@ -94,14 +120,14 @@ void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, Vi
         if (location->locationSetting["index"] != "none")
             file_path = location->locationSetting["index"];
         else if (location->locationSetting["autoindex"] == "on")
-            return sendAutoindexPage(requestInfo, sockfd, server, location);
+            return sendAutoindexPage(requestInfo, obj);
         else
-            return sendForbiddenPage(sockfd);//403エラー
+            return sendForbiddenPage(obj);//403エラー
     }
 
     std::ifstream file(file_path);
     if (!file.is_open())
-        return sendDefaultErrorPage(sockfd, server);//404エラー <- std::exitのほうがいい？
+        return sendDefaultErrorPage(server, obj);//404エラー <- std::exitのほうがいい？
     std::string line;
     std::string content;
     while (std::getline(file, line)) {
@@ -119,7 +145,7 @@ void HttpConnection::sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, Vi
     response += "Content-Type: text/html\n";
     response += "\n";
     response += content;
-    sendToClient(sockfd, response);
+    sendToClient(response, obj, NORMAL);
 }
 
 bool HttpConnection::checkCompleteRecieved(progressInfo obj){

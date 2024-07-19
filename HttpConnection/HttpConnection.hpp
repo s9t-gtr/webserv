@@ -39,6 +39,13 @@ typedef std::map<int, struct kevent*> keventMap;
 #define MAX_BUF_LENGTH 64
 #define UPLOAD "upload/"
 
+#define NORMAL 0
+#define CGI_FAIL 1
+#define BAD_REQ 2
+#define RECV 3
+#define FORK 4
+#define SEND 5
+
 class HttpConnection{
     private:
         static int kq;
@@ -62,29 +69,29 @@ class HttpConnection{
         static void eventRegister(struct kevent *changelist);
         void eventExecute(Config *conf, SOCKET sockefd, socketSet tcpSockets);
         void establishTcpConnection(SOCKET sockfd);
-        void sendResponse(RequestParse& requestInfo, SOCKET sockfd, progressInfo *obj);
+        void sendResponse(RequestParse& requestInfo, progressInfo *obj);
         void executeCgi(RequestParse& requestInfo, int *pipe_c2p);
 
-        void sendDefaultErrorPage(SOCKET sockfd, VirtualServer* server);
-        void sendAutoindexPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location);
+        void sendToClient(std::string response, progressInfo *obj, int kind);
+        void sendDefaultErrorPage(VirtualServer* server, progressInfo *obj);
+        void sendAutoindexPage(RequestParse& requestInfo, progressInfo *obj);
         std::string createAutoindexPage(RequestParse& requestInfo, std::string path);
-        void sendToClient(SOCKET sockfd, std::string response);
         std::string getGmtDate();
-        void sendStaticPage(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server, Location* location);
+        void sendStaticPage(RequestParse& requestInfo, progressInfo *obj);
         void createResponse(std::string statusLine, std::string content);
-        void sendRedirectPage(SOCKET sockfd, Location* location);
-        void postProcess(RequestParse& requestInfo, SOCKET sockfd, progressInfo *obj);
+        void sendRedirectPage(Location* location, progressInfo *obj);
+        void postProcess(RequestParse& requestInfo, progressInfo *obj);
         void executeCgi_postVersion(RequestParse& requestInfo, int pipe_c2p[2]);
-        void sendForbiddenPage(SOCKET sockfd);
-        void deleteProcess(RequestParse& requestInfo, SOCKET sockfd, VirtualServer* server);
-        void sendNotImplementedPage(SOCKET sockfd);
-        void sendNotAllowedPage(SOCKET sockfd);
-        void requestEntityPage(SOCKET sockfd);
+        void sendForbiddenPage(progressInfo *obj);
+        void deleteProcess(RequestParse& requestInfo, progressInfo *obj);
+        void sendNotImplementedPage(progressInfo *obj);
+        void sendNotAllowedPage(progressInfo *obj);
+        void requestEntityPage(progressInfo *obj);
 
 
         bool isAllowedMethod(Location* location, std::string method);
-        void sendInternalErrorPage(SOCKET sockfd);
-        void sendBadRequestPage(SOCKET sockfd);
+        void sendInternalErrorPage(progressInfo *obj, int kind);
+        void sendBadRequestPage(progressInfo *obj);
 
         bool isReadNewLine(std::string buffer);
         bool bodyConfirm(progressInfo info);
