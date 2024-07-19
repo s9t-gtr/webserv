@@ -46,6 +46,10 @@ clean:
 
 fclean: clean
 	rm -rf $(NAME)
+	@for file in $(CPPS); do \
+		sed -i '' 's|^\([[:space:]]*\)std::cerr << DEBUG|\1// std::cerr << DEBUG|g' "$$file"; \
+	done
+	@echo "Debug lines commented out"
 
 re: fclean all;
 
