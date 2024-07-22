@@ -47,6 +47,10 @@ void HttpConnection::sendToClient(std::string response, progressInfo *obj, int k
             }
             createNewEvent(obj->socket, EVFILT_READ, EV_ADD, 0, 0, obj);
         }
+        if(kind == CLOSE){
+            close(obj->socket);
+            delete obj;
+        }
         obj->httpConnection->initProgressInfo(obj, obj->socket, obj->sndbuf);
     }
     
@@ -158,6 +162,9 @@ void HttpConnection::sendStaticPage(RequestParse& requestInfo, progressInfo *obj
     response += "Content-Type: text/html\n";
     response += "\n";
     response += content;
+    if(requestInfo.getHeader("Connection") == "close"){
+        return sendToClient(response, obj, CLOSE);
+    }
     sendToClient(response, obj, NORMAL);
 }
 

@@ -172,7 +172,7 @@ std::string RequestParse::selectBestMatchLocation(std::map<std::string, Location
 
 void RequestParse::setCorrespondServer(Config *conf){
     server = conf->getServer(getHostName());
-    if(server->getListenPort() != getPort())
+    if(server != NULL && server->getListenPort() != getPort())
         server = NULL;
     if(!server){
         //port一致サーバの列挙
@@ -187,7 +187,6 @@ void RequestParse::setCorrespondServer(Config *conf){
         }
         //default_serverがなければindexが若いもの
         for(
-
             serversMap::iterator it = servers.begin();it != servers.end();it++){
             if(it->second->index == 0){
                 server = it->second;
@@ -306,7 +305,9 @@ std::string RequestParse::getHostName(){
     std::string directive = getHeader("Host");
     if(directive != ""){
         strVec spDirective = split(directive, ':');
-        return spDirective.size() != 2 ? "localhost" : spDirective[0];
+        if(directive[directive.length()-1] == '\r')
+            directive = directive.substr(0, directive.length() -1);
+        return spDirective.size() != 2 ? directive : spDirective[0];
     }
     return "";
 }

@@ -53,6 +53,8 @@ std::string VirtualServer::getServerName(){
     return serverSetting["server_name"];
 }
 std::string VirtualServer::getListenPort(){
+    if(serverSetting.find("listen") == serverSetting.end())   
+        return "";
     return serverSetting["listen"];
 }
 void VirtualServer::setLocation(std::string locationPath, Location *location){

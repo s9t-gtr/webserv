@@ -19,6 +19,7 @@ typedef struct progressInfo{
     void (*wHandler)(progressInfo *obj, Config *conf);
     void (*tHandler)(progressInfo *obj);
     void (*pHandler)(progressInfo *obj);
+    bool readCgiInitial;
     std::string buffer;
     std::string::size_type content_length;
     int pipe_c2p[2];
@@ -48,6 +49,7 @@ typedef std::map<int, struct kevent*> keventMap;
 #define RECV 3
 #define FORK 4
 #define SEND 5
+#define CLOSE 6
 
 class HttpConnection{
     private:

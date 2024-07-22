@@ -3,8 +3,7 @@
 int HttpConnection::kq;
 struct kevent *HttpConnection::eventlist;
 timespec HttpConnection::timeSpec = {0,0};
-// timespec HttpConnection::timeSpec = {0,1000000000};
-
+// timespec HttpConnection::timeSpec = {0,100000000}
 HttpConnection::HttpConnection(){}
 HttpConnection::~HttpConnection(){}
 HttpConnection::HttpConnection(socketSet tcpSockets){
@@ -52,9 +51,15 @@ void HttpConnection::eventRegister(struct kevent *changelist){
     }
 }
 
+void my_usleep(useconds_t usec){
+    clock_t st = std::clock();
+    clock_t et = st +(usec * CLOCKS_PER_SEC / 1000000);
+    while(std::clock() < et){;}
+}
 void HttpConnection::startEventLoop(Config *conf){
     while(1){
         ssize_t nevent = kevent(kq, NULL, 0, eventlist, sizeof(*eventlist), &timeSpec);
+        my_usleep(2000);
         for(ssize_t i = 0; i<nevent;i++){
             // std::cerr << DEBUG << BRIGHT_GREEN<< "<<<<<<<<<<<<<<< EVENT >>>>>>>>>>>>>>>" << RESET << std::endl;
             // std::cerr << DEBUG << "ident(socket or pid or timer): " << eventlist[i].ident << std::endl;
@@ -113,6 +118,7 @@ void HttpConnection::initProgressInfo(progressInfo *obj, SOCKET socket, int sndb
     obj->wHandler = NULL;
     obj->tHandler = NULL;
     obj->pHandler = NULL;
+    obj->readCgiInitial = true;
     obj->socket = socket;
     obj->exit_status = 0;
     obj->eofTimer = false;
@@ -173,6 +179,10 @@ void HttpConnection::sendHandler(progressInfo *obj, Config *conf){
 
 void HttpConnection::readCgiHandler(progressInfo *obj, Config *conf){
     // std::cerr << DEBUG << RED BOLD << "Status: Read CGI" << RESET << std::endl;
+    if(obj->readCgiInitial){
+        obj->readCgiInitial = false;
+        createNewEvent(obj->socket, EVFILT_TIMER, EV_DELETE, 0, 10000, obj);
+    }
     (void)conf;//wHandlerのインターフェース的に必要
     char buf[MAX_BUF_LENGTH];
 
@@ -276,6 +286,8 @@ void HttpConnection::sendResponse(RequestParse& requestInfo, progressInfo *obj){
     {
         if (isAllowedMethod(location, "POST") == false)
             return sendNotAllowedPage(obj);
+        else if(requestInfo.getPath() == UPLOAD)
+            postProcess(requestInfo, obj);
         else if(isCgi(requestInfo))
             postProcess(requestInfo, obj);
         else//メソッドがPOSTなのにリクエストパスがcgi以外の場合
