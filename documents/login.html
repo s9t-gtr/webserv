@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シンプルログインフォーム</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .login-form {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        input {
+            display: block;
+            margin: 10px 0;
+            padding: 5px;
+            width: 200px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-form">
+        <h2>ログイン</h2>
+        <div id="message" style="color: red;"></div> <!-- エラーメッセージ表示用 -->
+        <form id="loginForm" action="cgi_post/upload.cgi" method="POST" enctype="application/x-www-form-urlencoded">
+        <input type="text" id="username" name="username" placeholder="username" required>
+        <input type="password" id="password" name="password" placeholder="password" required>
+        <button type="submit">ログイン</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var formData = new URLSearchParams(new FormData(this)).toString();
+
+            fetch('cgi_post/upload.cgi', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: formData, 
+                credentials: 'include' // Cookieを含める
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                console.log('Response URL:', response.url);
+                
+                if (response.redirected) {
+                    console.log('Redirected to:', response.url);
+                    window.location.href = response.url;
+                    return null;
+                }
+                return response.text();
+            })
+            .then(data => {
+                if (data) {
+                    const messageElement = document.getElementById('message');
+                    if (messageElement) {
+                        messageElement.textContent = data;
+                    }
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                const messageElement = document.getElementById('message');
+                if (messageElement) {
+                    messageElement.textContent = 'An error occurred. Please try again.';
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>

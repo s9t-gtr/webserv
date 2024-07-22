@@ -186,7 +186,9 @@ void RequestParse::setCorrespondServer(Config *conf){
             }
         }
         //default_serverがなければindexが若いもの
-        for(serversMap::iterator it = servers.begin();it != servers.end();it++){
+        for(
+
+            serversMap::iterator it = servers.begin();it != servers.end();it++){
             if(it->second->index == 0){
                 server = it->second;
                 return ;
@@ -239,6 +241,8 @@ std::string RequestParse::getVersion(){
     return version;
 }
 std::string RequestParse::getHeader(std::string header){
+    if(headers.find(header) == headers.end())
+        return "";
     return headers[header];
 }
 std::string RequestParse::getBody(){
@@ -320,3 +324,52 @@ std::string RequestParse::getPort(){
     }
     return "";
 }
+
+std::string RequestParse::getSessionId(std::string cookieInfo){
+    size_t head = cookieInfo.find("SessionID=");
+    size_t tail = cookieInfo.find(";", head+1);
+    head = head+std::strlen("SessionID=");
+    std::string sessionId = cookieInfo.substr(head, tail - head);
+    if(sessionId[sessionId.size()-1] == '\r')
+        sessionId = sessionId.substr(0, sessionId.length()-1);
+    return sessionId;
+}
+
+bool RequestParse::searchSessionId(std::string cookieInfo){
+    std::string sessionId = getSessionId(cookieInfo);
+    std::ifstream ifs("request/userinfo.txt");
+    if(!ifs)
+        perror("UserInfo open failed");
+    std::string line;
+    while(!(ifs).eof()){
+        std::getline(ifs, line);
+        std::vector<std::string> vec = split(line, ' ');
+        if(vec[0] == sessionId){
+            ifs.close();
+            return true;
+        }
+    }
+    ifs.close();
+    return false;
+}
+
+std::vector<std::string> RequestParse::getUserInfo(std::string cookieInfo){
+    std::string sessionId = getSessionId(cookieInfo);
+    std::vector<std::string> vec;
+    std::ifstream ifs("request/userinfo.txt");
+    if(!ifs){
+        perror("open userinfo.txt: ");
+    }
+    std::string line;
+    while(!(ifs).eof()){
+        std::getline(ifs, line);
+        std::vector<std::string> vec = split(line, ' ');
+        if(vec[0] == sessionId){
+            ifs.close();
+            return vec;
+        }
+    }
+    ifs.close();
+    return vec;
+}
+

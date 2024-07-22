@@ -1,7 +1,7 @@
 #include "HttpConnection.hpp"
 
 
-static std::string getStringFromHtml(std::string wantHtmlPath){
+std::string HttpConnection::getStringFromHtml(std::string wantHtmlPath){
     std::ifstream file(wantHtmlPath);
     if (!file.is_open()) 
         perror("open error");
@@ -171,7 +171,6 @@ void HttpConnection::postProcess(RequestParse& requestInfo, progressInfo *obj)
         if (request_body.size() > number)
             return requestEntityPage(obj);
     }
-    std::string cgiPath = server->getCgiPath();
     int pipe_c2p[2];
     if(pipe(pipe_c2p) < 0)
         throw std::runtime_error("Error: pipe() failed");

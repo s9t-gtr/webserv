@@ -27,6 +27,8 @@ class RequestParse{
         std::string getPort();
         VirtualServer *getServer();
         Location *getLocation();
+        bool searchSessionId(std::string cookieInfo);
+        std::vector<std::string> getUserInfo(std::string cookieInfo);
 
     private: 
         std::string getRequestLine(std::string& requestMessage);
@@ -42,6 +44,11 @@ class RequestParse{
         Location* getLocationSetting();
         std::string selectBestMatchLocation(std::map<std::string, Location*> &locations);
         void createPathFromConfRoot();
+
+        //cookie/sessions
+        std::string getSessionId(std::string cookieInfo);
+
+
     private:
 
     private:

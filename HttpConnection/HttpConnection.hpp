@@ -28,6 +28,7 @@ typedef struct progressInfo{
     bool eofTimer; //true: on
     int sndbuf;
     int tmpKind;
+    std::string requestPath;
 
 } progressInfo;
 
@@ -75,6 +76,7 @@ class HttpConnection{
         void executeCgi(RequestParse& requestInfo, int *pipe_c2p);
 
         void sendToClient(std::string response, progressInfo *obj, int kind);
+        static std::string getStringFromHtml(std::string wantHtmlPath);
         void sendDefaultErrorPage(VirtualServer* server, progressInfo *obj);
         void sendAutoindexPage(RequestParse& requestInfo, progressInfo *obj);
         std::string createAutoindexPage(RequestParse& requestInfo, std::string path);
@@ -109,6 +111,17 @@ class HttpConnection{
         static void sendTimeoutPage(progressInfo *obj);
         static void sendLargeResponse(progressInfo *obj, Config *conf);
         static void confirmExitStatusFromCgi(progressInfo *obj);
+
+        //cookie/sessions
+        void cookiePage(RequestParse& requestInfo, progressInfo *obj);
+        static std::string createRedirectPath(std::string requestPath);
+
+        void sendLoginPage(int status, RequestParse& requestInfo, progressInfo *obj);
+        void sendUserPage(std::vector<std::string> userInfo, int status, RequestParse& requestInfo, progressInfo *obj);
+        static void deleteCgiHeader(std::string &responseHeaders);
+        static std::string addAnnotationToLoginPage(std::string annotation);
+
+
 };
 
 #endif

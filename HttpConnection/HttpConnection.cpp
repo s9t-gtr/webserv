@@ -67,7 +67,7 @@ void HttpConnection::startEventLoop(Config *conf){
             else if(eventlist[i].filter == EVFILT_WRITE)
                 obj->wHandler(obj, conf);
             else if(eventlist[i].filter == EVFILT_TIMER && obj->tHandler != NULL)
-                obj->tHandler(obj);
+                 obj->tHandler(obj);
             else if(eventlist[i].filter == EVFILT_PROC && obj->pHandler != NULL)
                 obj->pHandler(obj);
         }
@@ -118,6 +118,7 @@ void HttpConnection::initProgressInfo(progressInfo *obj, SOCKET socket, int sndb
     obj->eofTimer = false;
     obj->sndbuf = sndbuf;
     obj->tmpKind = -1;
+    obj->requestPath = "";
 }
 
 void HttpConnection::recvHandler(progressInfo *obj){
@@ -163,6 +164,7 @@ void HttpConnection::sendHandler(progressInfo *obj, Config *conf){
     // std::cerr << DEBUG << LIGHT_BLUE BOLD <<  "Status: Send" << RESET << std::endl;
     try{
         RequestParse requestInfo(obj->buffer, conf); //例外発生元はこれ
+        obj->requestPath = requestInfo.getPath();
         obj->httpConnection->sendResponse(requestInfo, obj);
     }catch(std::runtime_error){
         return obj->httpConnection->sendBadRequestPage(obj);
@@ -248,7 +250,6 @@ void HttpConnection::sendResponse(RequestParse& requestInfo, progressInfo *obj){
                 return sendDefaultErrorPage(server, obj);
             if (access(path.c_str(), X_OK))
                 return sendForbiddenPage(obj);
-
             int pipe_c2p[2];
             if(pipe(pipe_c2p) < 0)
                 throw std::runtime_error("Error: pipe() failed");

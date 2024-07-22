@@ -12,6 +12,8 @@ CGIS = cgi/test.cpp cgi/time.cpp cgi/loop.cpp
 
 CGIS_POST = cgi_post/upload.cpp cgi_post/upload2.cpp 
 
+COOKIE = request/userinfo.txt
+
 OBJS = $(CPPS:.cpp=.o)
 
 NAME = webserv
@@ -21,7 +23,7 @@ CGI_POST_TARGETS := $(patsubst cgi_post/%.cpp,cgi_post/%.cgi,$(CGIS_POST))
 cgi/%.cgi: cgi/%.cpp
 	$(CXX) $(CXXFLAGS) $< -o $@
 cgi_post/%.cgi: cgi_post/%.cpp
-	$(CXX) $(CXXFLAGS) $< -o $@
+	$(CXX) $(CXXFLAGS) cgi_post/utils/login.cpp $< -o $@
 
 CXX = c++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++98
@@ -37,6 +39,7 @@ all: $(NAME) $(CGI_TARGETS) $(CGI_POST_TARGETS);
 
 $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) -o $(NAME)
+	@touch $(COOKIE)
 
 clean: 
 	rm -rf $(OBJS) */*.dSYM
@@ -45,7 +48,7 @@ clean:
 	rm -f upload/*
 
 fclean: clean
-	rm -rf $(NAME)
+	rm -rf $(NAME) $(COOKIE)
 	@for file in $(CPPS); do \
 		sed -i '' 's|^\([[:space:]]*\)std::cerr << DEBUG|\1// std::cerr << DEBUG|g' "$$file"; \
 	done

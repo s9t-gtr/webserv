@@ -32,6 +32,7 @@
 #define LIGHT_BLUE "\033[1;34m"
 #define BLUE "\033[0;34m"
 #define CYAN "\033[36m"
+#define GRAY "\033[90m"
 //format
 #define BOLD "\033[1m"
 #define UNDERLINE "\033[4m"
