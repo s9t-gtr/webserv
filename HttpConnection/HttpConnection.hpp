@@ -54,7 +54,7 @@ typedef std::map<int, struct kevent*> keventMap;
 class HttpConnection{
     private:
         static int kq;
-        static struct kevent *eventlist;
+        static struct kevent eventlist[1000];
         static timespec timeSpec;
     private:
         HttpConnection();
