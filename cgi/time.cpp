@@ -29,8 +29,13 @@ int main(void)
   string strOutData;
   std::string now = getCurrentTime();
 
+  std::string responseBody = "<html><body><h1>" + now + "</h1></body></html>";
+  std::string::size_type contentLength = responseBody.length();
+  std::stringstream ss;
+  ss << contentLength;
+  std::string contentLengthStr = ss.str();
 
-  /* httpヘッダ */  
+  /* httpヘッダ */
   /* HTML出力であることを出力 */
   strOutData = "HTTP/1.1 200 OK\n";
   strOutData += "Date: Wed, 28 Oct 2020 07:57:45 GMT\n";
@@ -43,12 +48,12 @@ int main(void)
   strOutData += "2d-5913a76187bc0\"";
   strOutData += "\n";
   strOutData += "Accept-Ranges: bytes\n";
-  strOutData += "Content-Length: 44\n";
+  strOutData += "Content-Length: " + contentLengthStr + "\n";
   strOutData += "Keep-Alive: timeout=5, max=100\n";
   strOutData += "Connection: Keep-Alive\n";
   strOutData += "Content-Type: text/html\n";
   strOutData += "\n";
-  strOutData += "<html><body><h1>" + now + "</h1></body></html>";
+  strOutData += responseBody;
   /* 標準出力に設定内容を出力 */
   std::cout << strOutData.c_str();
 }
