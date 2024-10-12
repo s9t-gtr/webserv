@@ -55,6 +55,12 @@ void my_usleep(useconds_t usec){
     clock_t et = st +(usec * CLOCKS_PER_SEC / 1000000);
     while(std::clock() < et){;}
 }
+
+void HttpConnection::handleSend(progressInfo *obj) {
+    sendToClient(obj->sendResponse, obj, obj->sendKind);
+    obj->sendFlag = false;
+}
+
 void HttpConnection::startEventLoop(Config *conf){
     while(1){
         ssize_t nevent = kevent(kq, NULL, 0, eventlist, sizeof(*eventlist), &timeSpec);
@@ -66,6 +72,8 @@ void HttpConnection::startEventLoop(Config *conf){
             progressInfo *obj = (progressInfo *)eventlist[i].udata;
             if(obj == NULL)
                 establishTcpConnection(eventlist[i].ident);
+            else if(obj->sendFlag)
+                handleSend(obj);
             else if(eventlist[i].filter == EVFILT_READ)
                 obj->rHandler(obj);
             else if(eventlist[i].filter == EVFILT_WRITE)
@@ -124,6 +132,10 @@ void HttpConnection::initProgressInfo(progressInfo *obj, SOCKET socket, int sndb
     obj->sndbuf = sndbuf;
     obj->tmpKind = -1;
     obj->requestPath = "";
+
+    obj->sendFlag = false;
+    obj->sendKind = NORMAL;
+    obj->sendResponse = "";
 }
 
 void HttpConnection::recvHandler(progressInfo *obj){
@@ -200,13 +212,19 @@ void HttpConnection::readCgiHandler(progressInfo *obj, Config *conf){
 void HttpConnection::sendCgiHandler(progressInfo *obj, Config *conf){
     (void)conf;
     // std::cerr << DEBUG << BLUE BOLD<< "Status: Send CGI" << RESET << std::endl;
-    obj->httpConnection->sendToClient(obj->buffer, obj, NORMAL);
+    obj->sendResponse = obj->buffer;
+    obj->sendKind = NORMAL;
+    obj->sendFlag = true;
+    // obj->httpConnection->sendToClient(obj->buffer, obj, NORMAL);
 }
 
 void HttpConnection::sendLargeResponse(progressInfo *obj, Config *conf){
     (void)conf;
     // std::cerr << DEBUG << LIGHT_GREEN BOLD<< "Status: Large Response" << RESET << std::endl;
-    obj->httpConnection->sendToClient(obj->buffer, obj, obj->tmpKind);
+    obj->sendResponse = obj->buffer;
+    obj->sendKind = obj->tmpKind;
+    obj->sendFlag = true;
+    // obj->httpConnection->sendToClient(obj->buffer, obj, obj->tmpKind);
 }
 
 
