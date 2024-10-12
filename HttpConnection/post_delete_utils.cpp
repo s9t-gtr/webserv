@@ -137,6 +137,7 @@ void HttpConnection::sendTimeoutPage(progressInfo *obj)
     obj->sendKind = CGI_FAIL;
     obj->sendFlag = true;
     // obj->httpConnection->sendToClient(response, obj, CGI_FAIL);
+    createNewEvent(obj->socket, EVFILT_WRITE, EV_ADD | EV_ONESHOT, 0, 0, obj);
 }
 
 void HttpConnection::sendInternalErrorPage(progressInfo *obj, int kind)
