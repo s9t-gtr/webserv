@@ -137,7 +137,10 @@ void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, progressInfo *
     } else if (info.st_mode & S_IFDIR) {
         // パスがディレクトリである場合
         std::string response = createAutoindexPage(requestInfo, path);
-        sendToClient(response, obj, NORMAL);
+        obj->sendResponse = response;
+        obj->sendKind = NORMAL;
+        obj->sendFlag = true;
+        // sendToClient(response, obj, NORMAL);
     } else {
         // パスがディレクトリではない場合(ファイルの時)
         return sendStaticPage(requestInfo, obj);

@@ -31,6 +31,10 @@ typedef struct progressInfo{
     int tmpKind;
     std::string requestPath;
 
+    bool sendFlag;
+    int sendKind;
+    std::string sendResponse;
+
 } progressInfo;
 
 typedef struct timespec timespec;
@@ -123,6 +127,7 @@ class HttpConnection{
         static void deleteCgiHeader(std::string &responseHeaders);
         static std::string addAnnotationToLoginPage(std::string annotation);
 
+        void handleSend(progressInfo *obj);
 
 };
 

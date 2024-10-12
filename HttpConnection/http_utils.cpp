@@ -80,7 +80,10 @@ void HttpConnection::sendRedirectPage(Location* location, progressInfo *obj)
     response += "Location: " + location->locationSetting["return"] + "\n";
     response += "\n";//ヘッダーとボディを分けるために、ボディが空でも必要
 
-    sendToClient(response, obj, NORMAL);
+    obj->sendResponse = response;
+    obj->sendKind = NORMAL;
+    obj->sendFlag = true;
+    // sendToClient(response, obj, NORMAL);
 
 }
 
@@ -114,7 +117,10 @@ void HttpConnection::sendDefaultErrorPage(VirtualServer* server, progressInfo *o
     response += "\n";
     response += content;
 
-    sendToClient(response, obj, NORMAL);
+    obj->sendResponse = response;
+    obj->sendKind = NORMAL;
+    obj->sendFlag = true;
+    // sendToClient(response, obj, NORMAL);
 }
 
 // サーバーからのレスポンスとして静的ファイルを送る関数
@@ -163,9 +169,16 @@ void HttpConnection::sendStaticPage(RequestParse& requestInfo, progressInfo *obj
     response += "\n";
     response += content;
     if(requestInfo.getHeader("Connection") == "close"){
-        return sendToClient(response, obj, CLOSE);
+        obj->sendResponse = response;
+        obj->sendKind = CLOSE;
+        obj->sendFlag = true;
+        return ;
+        // return sendToClient(response, obj, CLOSE);
     }
-    sendToClient(response, obj, NORMAL);
+    obj->sendResponse = response;
+    obj->sendKind = NORMAL;
+    obj->sendFlag = true;
+    // sendToClient(response, obj, NORMAL);
 }
 
 bool HttpConnection::checkCompleteRecieved(progressInfo obj){
@@ -254,7 +267,10 @@ void HttpConnection::sendLoginPage(int status, RequestParse& requestInfo, progre
         response += "Location: " + redirectPath + "\n";
         response += "\n";
         response += "Login successful";
-        sendToClient(response, obj, NORMAL);
+        obj->sendResponse = response;
+        obj->sendKind = NORMAL;
+        obj->sendFlag = true;
+        // sendToClient(response, obj, NORMAL);
         return ;
     }
     std::string content = getStringFromHtml("documents/login.html");
@@ -267,7 +283,10 @@ void HttpConnection::sendLoginPage(int status, RequestParse& requestInfo, progre
     response += "Content-Type: text/html\n";
     response += "\n";
     response += content;
-    sendToClient(response, obj, NORMAL);
+    obj->sendResponse = response;
+    obj->sendKind = NORMAL;
+    obj->sendFlag = true;
+    // sendToClient(response, obj, NORMAL);
 }
 
 void HttpConnection::sendUserPage(std::vector<std::string> userInfo, int status, RequestParse& requestInfo, progressInfo *obj){
@@ -285,7 +304,10 @@ void HttpConnection::sendUserPage(std::vector<std::string> userInfo, int status,
         response += "\n";
         response += "Login successful";
 
-        sendToClient(response, obj, NORMAL);
+        obj->sendResponse = response;
+        obj->sendKind = NORMAL;
+        obj->sendFlag = true;
+        // sendToClient(response, obj, NORMAL);
         return ;
    }
    std::ifstream ifs("documents/user.html");
@@ -312,7 +334,10 @@ void HttpConnection::sendUserPage(std::vector<std::string> userInfo, int status,
     response += "Content-Type: text/html\n";
     response += "\n";
     response += content;
-    sendToClient(response, obj, NORMAL);
+    obj->sendResponse = response;
+    obj->sendKind = NORMAL;
+    obj->sendFlag = true;
+    // sendToClient(response, obj, NORMAL);
 }
 
 

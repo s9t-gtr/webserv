@@ -28,7 +28,10 @@ void HttpConnection::sendBadRequestPage(progressInfo *obj)
     response += "\n";
     response += content;
 
-    sendToClient(response, obj, BAD_REQ);
+    obj->sendResponse = response;
+    obj->sendKind = BAD_REQ;
+    obj->sendFlag = true;
+    // sendToClient(response, obj, BAD_REQ);
 }
 
 void HttpConnection::sendForbiddenPage(progressInfo *obj)
@@ -45,7 +48,10 @@ void HttpConnection::sendForbiddenPage(progressInfo *obj)
     response += "\n";
     response += content;
 
-    sendToClient(response, obj, NORMAL);
+    obj->sendResponse = response;
+    obj->sendKind = NORMAL;
+    obj->sendFlag = true;
+    // sendToClient(response, obj, NORMAL);
 }
 
 void HttpConnection::sendNotAllowedPage(progressInfo *obj)
@@ -62,7 +68,10 @@ void HttpConnection::sendNotAllowedPage(progressInfo *obj)
     response += "\n";
     response += content;
 
-    sendToClient(response, obj, NORMAL);
+    obj->sendResponse = response;
+    obj->sendKind = NORMAL;
+    obj->sendFlag = true;
+    // sendToClient(response, obj, NORMAL);
 
 }
 
@@ -80,7 +89,10 @@ void HttpConnection::requestEntityPage(progressInfo *obj)
     response += "\n";
     response += content;
 
-    sendToClient(response, obj, NORMAL);
+    obj->sendResponse = response;
+    obj->sendKind = NORMAL;
+    obj->sendFlag = true;
+    // sendToClient(response, obj, NORMAL);
 }
 
 void HttpConnection::sendNotImplementedPage(progressInfo *obj)
@@ -97,7 +109,10 @@ void HttpConnection::sendNotImplementedPage(progressInfo *obj)
     response += "\n";
     response += content;
 
-    sendToClient(response, obj, NORMAL);
+    obj->sendResponse = response;
+    obj->sendKind = NORMAL;
+    obj->sendFlag = true;
+    // sendToClient(response, obj, NORMAL);
 }
 
 void HttpConnection::sendTimeoutPage(progressInfo *obj)
@@ -118,7 +133,10 @@ void HttpConnection::sendTimeoutPage(progressInfo *obj)
     response += "\n";
     response += content;
 
-    obj->httpConnection->sendToClient(response, obj, CGI_FAIL);
+    obj->sendResponse = response;
+    obj->sendKind = CGI_FAIL;
+    obj->sendFlag = true;
+    // obj->httpConnection->sendToClient(response, obj, CGI_FAIL);
 }
 
 void HttpConnection::sendInternalErrorPage(progressInfo *obj, int kind)
@@ -135,7 +153,10 @@ void HttpConnection::sendInternalErrorPage(progressInfo *obj, int kind)
     response += "\n";
     response += content;
 
-    sendToClient(response, obj, kind);
+    obj->sendResponse = response;
+    obj->sendKind = kind;
+    obj->sendFlag = true;
+    // sendToClient(response, obj, kind);
 }
 
 // GETのcgi関数と違うのはPOSTメソッドで届いたクライアントからのリクエストボディをexecveの引数に渡すところ
@@ -208,5 +229,8 @@ void HttpConnection::deleteProcess(RequestParse& requestInfo, progressInfo *obj)
     response += "Server: webserv/1.0.0\n";
     response += "\n";//ヘッダーとボディを分けるために、ボディが空でも必要
 
-    sendToClient(response, obj, NORMAL);
+    obj->sendResponse = response;
+    obj->sendKind = NORMAL;
+    obj->sendFlag = true;
+    // sendToClient(response, obj, NORMAL);
 }
