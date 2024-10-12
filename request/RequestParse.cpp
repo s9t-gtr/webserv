@@ -216,6 +216,9 @@ void RequestParse::createPathFromConfRoot(){
     pathFromConfRoot = location->locationSetting["root"] + rawPath.substr(1);
     if(pathFromConfRoot == "")
         pathFromConfRoot = "./";
+    if (pathFromConfRoot.length() > 0 && pathFromConfRoot[pathFromConfRoot.length() - 1] == '/') {
+        pathFromConfRoot.erase(pathFromConfRoot.length() - 1); // 最後の文字を削除
+    }
 }
 
 
