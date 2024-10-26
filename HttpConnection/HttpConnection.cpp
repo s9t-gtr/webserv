@@ -10,15 +10,15 @@ HttpConnection::HttpConnection(socketSet tcpSockets){
     connectionPrepare(tcpSockets);
 }
 
-HttpConnection* HttpConnection::getInstance(socketSet tcpSockets){
-    HttpConnection *inst;
-    inst = new HttpConnection(tcpSockets);
-    return inst;
-}
+// HttpConnection* HttpConnection::getInstance(socketSet tcpSockets){
+//     HttpConnection *inst;
+//     inst = new HttpConnection(tcpSockets);
+//     return inst;
+// }
 
-void HttpConnection::destroy(HttpConnection* inst){
-    delete inst;
-}
+// void HttpConnection::destroy(HttpConnection* inst){
+//     delete inst;
+// }
 
 void HttpConnection::connectionPrepare(socketSet tcpSockets){
     createKqueue();
@@ -65,20 +65,20 @@ void HttpConnection::startEventLoop(Config *conf){
 
             progressInfo *obj = (progressInfo *)eventlist[i].udata;
             if(obj == NULL)
-                establishTcpConnection(eventlist[i].ident);
+                establishTcpConnection(eventlist[i].ident, conf);
             else if(eventlist[i].filter == EVFILT_READ)
                 obj->rHandler(obj);
             else if(eventlist[i].filter == EVFILT_WRITE)
-                obj->wHandler(obj, conf);
-            else if(eventlist[i].filter == EVFILT_TIMER && obj->tHandler != NULL)
-                 obj->tHandler(obj);
-            else if(eventlist[i].filter == EVFILT_PROC && obj->pHandler != NULL)
-                obj->pHandler(obj);
+                obj->wHandler(obj);
+            else if(eventlist[i].filter == EVFILT_TIMER && obj->timerHandler != NULL)
+                 obj->timerHandler(obj);
+            else if(eventlist[i].filter == EVFILT_PROC && obj->processHandler != NULL)
+                obj->processHandler(obj);
         }
     }
 }
 
-void HttpConnection::establishTcpConnection(SOCKET sockfd){
+void HttpConnection::establishTcpConnection(SOCKET sockfd, Config *config){
     // std::cerr << DEBUG << "TCP CONNECTION ESTABLISHED " << std::endl;
 
     struct sockaddr_storage client_sa;
@@ -102,8 +102,8 @@ void HttpConnection::establishTcpConnection(SOCKET sockfd){
     getsockopt(newSocket, SOL_SOCKET, SO_RCVBUF, &rcvbuf, &len);
     // std::cerr << DEBUG << "rcvbuf: " << rcvbuf << std::endl;//NOTICE: これ以上の長さのレスポンスを返すためにSend()もloopすべきかも
 
-    progressInfo *obj = new progressInfo();
-    std::memset(obj, 0, sizeof(progressInfo));
+    progressInfo *obj = new progressInfo(config);
+    // std::memset(obj, 0, sizeof(progressInfo));
     initProgressInfo(obj, newSocket, sndbuf);
     createNewEvent(newSocket, EVFILT_READ, EV_ADD, 0, 0, obj);
 }
@@ -115,219 +115,224 @@ void HttpConnection::initProgressInfo(progressInfo *obj, SOCKET socket, int sndb
     obj->httpConnection = this;
     obj->rHandler = recvHandler;
     obj->wHandler = NULL;
-    obj->tHandler = NULL;
-    obj->pHandler = NULL;
-    obj->readCgiInitial = true;
+    obj->timerHandler = NULL;
+    obj->processHandler = NULL;
     obj->socket = socket;
     obj->exit_status = 0;
-    obj->eofTimer = false;
+    obj->messageTimer = false;
+    obj->cgiTimer = false;
     obj->sndbuf = sndbuf;
-    obj->tmpKind = -1;
+    obj->sendKind = -1;
     obj->requestPath = "";
 }
 
+
 void HttpConnection::recvHandler(progressInfo *obj){
     // std::cerr << DEBUG << BRIGHT_MAGENTA BOLD << "Status: Recv" << RESET << std::endl;
-    if(obj->eofTimer == true){
-        createNewEvent(obj->socket, EVFILT_TIMER, EV_DELETE, 0, 3000, obj);//未起動だったものは消すことでtimer大量生成を防ぐ
-    }
+    deleteTimer(obj);
+
     char buf[MAX_BUF_LENGTH];
     int bytesReceived = recv(obj->socket, &buf, MAX_BUF_LENGTH, MSG_DONTWAIT);
     // std::cerr << DEBUG << "bytesReceived: " << bytesReceived << std::endl;
     if(0 < bytesReceived){
-        if(obj->buffer.size()+bytesReceived < obj->buffer.max_size()){
-            obj->buffer += std::string(buf, buf+bytesReceived);
-            if(obj->httpConnection->checkCompleteRecieved(*obj)){
-                obj->wHandler = sendHandler;
-                obj->eofTimer = false;
-                obj->tHandler = NULL;
-                createNewEvent(obj->socket, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+        if(obj->wHandler == NULL)
+            obj->requestInfo.readBufferAndParse(buf, bytesReceived);
+        if(obj->requestInfo.getReadingStatus() == Request::Complete){
+            
+            createNewEvent(obj->socket, EVFILT_READ, EV_DELETE, 0, 0, NULL); //リクエストが完結したらREADは不要になる
+            obj->rHandler = NULL;
+
+            int responseType = obj->responseInfo.createResponse(obj);
+            if(responseType == STATIC_PAGE){
+
                 createNewEvent(obj->socket, EVFILT_WRITE, EV_ADD, 0, 0, obj);
-            }else{
-                obj->eofTimer = true;
-                obj->tHandler = recvEofTimerHandler;
-                createNewEvent(obj->socket, EVFILT_TIMER, EV_ADD | EV_ONESHOT, 0, 3000, obj);
+                obj->wHandler = sendToClient;
+
+                return ;
+            }else if(responseType == CGI){
+                //timerHandlerとprocessHandlerに関わるイベントを作成する
+                setTimer(obj, CGI_TIMEOUT_DETECTION);
+
+                createNewEvent(obj->responseInfo.getPidfd(), EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, obj);
+                obj->processHandler = cgiExitHandler;
+
+                return ;
             }
-        }else
-            obj->httpConnection->sendBadRequestPage(obj);
+        }else{
+            setTimer(obj, REQUEST_EOF_DETECTION);
+        }
     }else if(bytesReceived == 0){
         // std::cerr << "close: socket: " << obj->socket << std::endl;
         close(obj->socket);
+        // std::memset(obj, 0, sizeof(progressInfo));
         delete obj;
-    }else
-        obj->httpConnection->sendInternalErrorPage(obj, RECV);
-}
-
-void HttpConnection::recvEofTimerHandler(progressInfo *obj){
-    // std::cerr << DEBUG << ORANGE BOLD << "Status: EofTimerHandler" << std::endl;
-    if(obj->eofTimer == true){//sendHandlerに遷移した場合は何もしない
-        obj->httpConnection->sendBadRequestPage(obj);
+    }else {
+        obj->sendKind = RECV;
+        obj->responseInfo.createResponseFromStatusCode(500, obj->requestInfo);
+        obj->wHandler = sendToClient;
     }
 }
 
-void HttpConnection::sendHandler(progressInfo *obj, Config *conf){
-    // std::cerr << DEBUG << LIGHT_BLUE BOLD <<  "Status: Send" << RESET << std::endl;
-    try{
-        RequestParse requestInfo(obj->buffer, conf); //例外発生元はこれ
-        obj->requestPath = requestInfo.getPath();
-        obj->httpConnection->sendResponse(requestInfo, obj);
-    }catch(std::runtime_error){
-        return obj->httpConnection->sendBadRequestPage(obj);
-    }
-}
 
-void HttpConnection::readCgiHandler(progressInfo *obj, Config *conf){
-    // std::cerr << DEBUG << RED BOLD << "Status: Read CGI" << RESET << std::endl;
-    if(obj->readCgiInitial){
-        obj->readCgiInitial = false;
-        createNewEvent(obj->socket, EVFILT_TIMER, EV_DELETE, 0, 10000, obj);
-    }
-    (void)conf;//wHandlerのインターフェース的に必要
-    char buf[MAX_BUF_LENGTH];
+// void HttpConnection::sendCgiHandler(progressInfo *obj){
+//     std::cerr << DEBUG << BLUE BOLD<< "Status: Send CGI" << RESET << std::endl;
+//     obj->sendKind = NORMAL;
+//     obj->httpConnection->sendToClient(obj->buffer, obj);
+// }
 
-    ssize_t bytesReceived = read(obj->pipe_c2p[R], &buf, MAX_BUF_LENGTH);
-    if(0 < bytesReceived){
-        obj->buffer += std::string(buf, buf+bytesReceived);
-        // std::cerr << DEBUG << "bytesReceived: " << bytesReceived << std::endl;
-        if(obj->httpConnection->checkCompleteRecieved(*obj)){
-            obj->wHandler = sendCgiHandler;
-            close(obj->pipe_c2p[R]);
-        }
-    }else
-        obj->httpConnection->sendInternalErrorPage(obj, NORMAL);
-}
-
-void HttpConnection::sendCgiHandler(progressInfo *obj, Config *conf){
-    (void)conf;
-    // std::cerr << DEBUG << BLUE BOLD<< "Status: Send CGI" << RESET << std::endl;
-    obj->httpConnection->sendToClient(obj->buffer, obj, NORMAL);
-}
-
-void HttpConnection::sendLargeResponse(progressInfo *obj, Config *conf){
-    (void)conf;
-    // std::cerr << DEBUG << LIGHT_GREEN BOLD<< "Status: Large Response" << RESET << std::endl;
-    obj->httpConnection->sendToClient(obj->buffer, obj, obj->tmpKind);
+void HttpConnection::largeResponseHandler(progressInfo *obj){
+    // send()の連続呼び出しを防ぐためのhandler
+    // std::cerr << DEBUG << LIGHT_GREEN BOLD << "Status: Large Response" << RESET << std::endl;
+    sendToClient(obj);
 }
 
 
-bool HttpConnection::isAllowedMethod(Location* location, std::string method)
-{
-    if(location->locationSetting["allow_method"] == "none")
-        return true;
-    std::vector<std::string>status = split(location->locationSetting["allow_method"], ' ');
-    for (std::vector<std::string>::iterator it = status.begin(); it != status.end(); ++it)
-    {
-        if (*it == method)
-            break;
-        if (it == status.end() - 1)
-            return false;
-    }
-    return true;
-}
-
-bool isCgi(RequestParse& requestInfo)
-{
-    std::string path = requestInfo.getPath();
-    if (path.length() >= 4) {
-        std::string lastFourChars = path.substr(path.length() - 4);
-        
-        if (lastFourChars == ".cgi") {
-            return true;
-        } else {
-            return false;
-        }
-    }
-    return false;
-}
-
-void HttpConnection::sendResponse(RequestParse& requestInfo, progressInfo *obj){
-    VirtualServer *server = requestInfo.getServer();
-    Location *location = requestInfo.getLocation();
-    std::string path = requestInfo.getPath();
-    if (requestInfo.getMethod() == "GET")
-    {
-        // allow_methodが設定され、かつGETが含まれていなかった場合
-        if (isAllowedMethod(location, "GET") == false)
-            return sendNotAllowedPage(obj);
-        // redirec ->location設定の中で最優先
-        if (location->locationSetting["return"] != "none")
-            sendRedirectPage(location, obj);
-        //autoindex ->sendStaticPage関数内
-        else if (isCgi(requestInfo))//<- .cgi実行ファイルもMakefileで作成・削除できるようにする
-        {
-            if (access(path.c_str(), F_OK) != 0)
-                return sendDefaultErrorPage(server, obj);
-            if (access(path.c_str(), X_OK))
-                return sendForbiddenPage(obj);
-            int pipe_c2p[2];
-            if(pipe(pipe_c2p) < 0)
-                throw std::runtime_error("Error: pipe() failed");
-            obj->pipe_c2p[R] = pipe_c2p[R];
-            obj->pipe_c2p[W] = pipe_c2p[W];
-            obj->tHandler = sendTimeoutPage;
-            obj->pHandler = confirmExitStatusFromCgi;
-            pid_t pid = fork();
-            if(pid == 0){
-                executeCgi(requestInfo, pipe_c2p);
-            } else if(pid > 0) {
-                obj->childPid = pid;
-                createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
-                createNewEvent(obj->socket, EVFILT_TIMER, EV_ADD | EV_ONESHOT, 0, 10000, obj);
-                createNewEvent(pid, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, obj);
-            } else 
-                sendInternalErrorPage(obj, FORK);
-        }
-        //その他の静的ファイルまたはディレクトリ
-        else
-            sendStaticPage(requestInfo, obj);
-    }
-    else if (requestInfo.getMethod() == "POST")
-    {
-        if (isAllowedMethod(location, "POST") == false)
-            return sendNotAllowedPage(obj);
-        else if(requestInfo.getPath() == UPLOAD)
-            postProcess(requestInfo, obj);
-        else if(isCgi(requestInfo))
-            postProcess(requestInfo, obj);
-        else//メソッドがPOSTなのにリクエストパスがcgi以外の場合
-            sendForbiddenPage(obj);
-    }
-    else if (requestInfo.getMethod() == "DELETE")
-    {
-        if (isAllowedMethod(location, "DELETE") == false)
-            return sendNotAllowedPage(obj);
-        if (path.substr(0, 7) == UPLOAD)// リクエストパスがアップロード可能なディレクトリならファイルの削除
-            deleteProcess(requestInfo, obj);
-        else//メソッドがDELETEなのにリクエストパスが"/upload/"以外の場合
-            sendForbiddenPage(obj);
-    }
-    else //GET,POST,DELETE以外の実装していないメソッド
-        sendNotImplementedPage(obj);
-}
 
 
-void HttpConnection::executeCgi(RequestParse& requestInfo, int pipe_c2p[2]){
-    close(pipe_c2p[R]);
-    dup2(pipe_c2p[W],1);
-    close(pipe_c2p[W]);
-    extern char** environ;
-    std::string path = requestInfo.getPath();
-    char* const cgi_argv[] = { const_cast<char*>(path.c_str()), NULL };
-    const char* cPath = path.c_str();
-    if(execve(cPath, cgi_argv, environ) < 0)
-        exit(1);
-}
 
-void HttpConnection::confirmExitStatusFromCgi(progressInfo *obj){
-    obj->tHandler = NULL;
+void HttpConnection::cgiExitHandler(progressInfo *obj){
+    // triggered by oneshot process event
+    deleteTimer(obj);
     // std::cerr << DEBUG << PINK BOLD<< "Status: Exit Cgi " << RESET << std::endl;
     int status;
-    waitpid(obj->childPid, &status, 0);
-    close(obj->pipe_c2p[W]);
-    if (WEXITSTATUS(status) == 0){
-        obj->buffer = "";
+    waitpid(obj->responseInfo.getPidfd(), &status, 0);
+    close(obj->responseInfo.getPipefd(W));
+    if (WEXITSTATUS(status) == 0){ //cgi実行プロセスの正常終了
         obj->wHandler = readCgiHandler;
-        createNewEvent(obj->socket, EVFILT_WRITE, EV_ADD, 0, 0, obj);
-    } else
-        obj->httpConnection->sendInternalErrorPage(obj, CGI_FAIL);
+    } else {
+        obj->responseInfo.createResponseFromStatusCode(500, obj->requestInfo);
+        obj->wHandler = sendToClient;
+
+        close(obj->responseInfo.getPipefd(R));
+    }
+    createNewEvent(obj->socket, EVFILT_WRITE, EV_ADD, 0, 0, obj);
+}
+
+void HttpConnection::readCgiHandler(progressInfo *obj){
+    //triggered by write event
+    // std::cerr << DEBUG << RED BOLD << "Status: Read CGI" << RESET << std::endl;
+    char buf[MAX_BUF_LENGTH];
+
+    ssize_t bytesReceived = read(obj->responseInfo.getPipefd(R), &buf, MAX_BUF_LENGTH);
+    if(0 < bytesReceived){
+        obj->buffer += std::string(buf, buf+bytesReceived);
+        obj->responseInfo.readBufferAndParse(buf, bytesReceived);
+        // std::cerr << DEBUG << "bytesReceived: " << bytesReceived << std::endl;
+        if(obj->responseInfo.getReadingStatus() != Response::Complete){
+            // obj->wHandler = sendCgiHandler;
+            obj->wHandler = sendToClient;
+            close(obj->responseInfo.getPipefd(R));
+        }
+    }else{
+        // obj->sendKind = NORMAL;
+        // obj->httpConnection->sendInternalErrorPage(obj);
+        obj->wHandler = sendToClient;
+        obj->responseInfo.createResponseFromStatusCode(500, obj->requestInfo);
+    }
+}
+
+/*
+    timer handler
+*/
+
+// void HttpConnection::recvEofTimerHandler(progressInfo *obj){
+//     std::cerr << DEBUG << ORANGE BOLD << "Status: EofTimerHandler" << std::endl;
+//     if(obj->messageTimer == true){//sendHandlerに遷移した場合は何もしない
+//         obj->httpConnection->sendBadRequestPage(obj);
+//     }
+// }
+
+void HttpConnection::timeoutHandler(progressInfo *obj){
+    StatusCode_t statusCode = 0;
+    if(obj->cgiTimer){
+        statusCode = 504; 
+    }else if(obj->messageTimer){
+        statusCode = 400; 
+    }
+    obj->responseInfo.createResponseFromStatusCode(statusCode, obj->requestInfo);
+    obj->wHandler = sendToClient;
+}
+
+
+void HttpConnection::deleteTimer(progressInfo *obj){
+    /*
+
+    */
+    if(obj->messageTimer == true){
+        obj->messageTimer = false;
+
+        createNewEvent(obj->socket, EVFILT_TIMER, EV_DELETE, 0, 60000, obj);//未起動だったものは消すことでtimer大量生成を防ぐ
+        obj->timerHandler = NULL; 
+    }
+    if(obj->cgiTimer == true){
+        obj->cgiTimer = false;
+
+        createNewEvent(obj->socket, EVFILT_TIMER, EV_DELETE, 0, 10000, obj);
+        obj->timerHandler = NULL; 
+    }
+}
+
+
+void HttpConnection::setTimer(progressInfo *obj, int type){
+    if(type == REQUEST_EOF_DETECTION){
+        obj->messageTimer = true;
+        createNewEvent(obj->socket, EVFILT_TIMER, EV_ADD | EV_ONESHOT, 0, 60000, obj);//nginx behavior(1 min timer)
+    }
+    if(type == CGI_TIMEOUT_DETECTION){
+        obj->cgiTimer = true;
+        createNewEvent(obj->socket, EVFILT_TIMER, EV_ADD | EV_ONESHOT, 0, 10000, obj);
+    }
+    obj->timerHandler = timeoutHandler;
+}
+
+
+void HttpConnection::sendToClient(progressInfo *obj){
+    /*
+        kind: 
+            normal: 0 - 通信は切断しないしwriteイベントもまだ削除していない
+            cgi: 1 - cgi実行時にWRITEイベントは削除するため分岐が必要
+            bad_request: 2 - objをdeleteしつつsocketもcloseするので分岐が必要
+    
+    */
+    // std::cerr << DEBUG << "sendtoClient()" << std::endl;
+    // std::cerr << DEBUG << GRAY << "======================= response =======================" << std::endl;
+    // std::cerr << DEBUG << obj->buffer << RESET << std::endl;
+    bool isLargeResponse = true;
+    std::string response = obj->responseInfo.getResponse();
+    if((size_t)obj->sndbuf < response.length()){
+        obj->responseInfo.setResponse(response.substr(obj->sndbuf));
+        response = response.substr(0, obj->sndbuf);
+        obj->wHandler = largeResponseHandler;
+    }else
+        isLargeResponse = false;
+
+    int status = send(obj->socket, response.c_str(), response.length(), 0);
+    if (status <= 0){
+        // std::cerr << DEBUG << "---- send(): error ----: " << obj->socket << std::endl;
+        close(obj->socket);
+        obj = NULL;
+        delete obj;
+        return ;
+    }
+    if(!isLargeResponse){//largeResponse送信途中でないのならば
+        StatusCode_t statusCode = obj->responseInfo.getStatusCode();
+        if(statusCode == 400 || statusCode == 500 || obj->requestInfo.getField("Connection") == "close"){//bad_requestする時にはsocketとobjを消すのでinitもreadイベント生成も不要
+            // std::cerr << DEBUG << "---- close: socket ----: " << obj->socket << std::endl;
+            close(obj->socket);
+            obj = NULL;
+            delete obj;
+            return ;
+        }
+        // if(obj->sendKind != RECV){ //recvの時はinitだけすれば良い
+        //     if(obj->sendKind != CGI_FAIL){ //writeをaddする前にsendInternalErrirに入るのでDELETEしない
+        //         createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
+        //     }
+        // }
+
+        //次のリクエストに備える(bodyの不要なリクエストにbodyが入っていた場合、次のreadの先頭に来るのを実装するか否か迷い中)
+        createNewEvent(obj->socket, EVFILT_READ, EV_ADD, 0, 0, obj);
+        createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
+        obj->httpConnection->initProgressInfo(obj, obj->socket, obj->sndbuf);
+    }   
+
 }

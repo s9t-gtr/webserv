@@ -55,19 +55,25 @@ void Location::confirmIndex()
 
 void Location::confirmRoot()
 {
-    if(locationSetting.find("root") == locationSetting.end())
-        setSetting("root", "");
-    size_t len = locationSetting["root"].length();
-    if(0 < len && locationSetting["root"][len-1] != '/'){
-        /*
-            "document"や".."を指定された時に末尾に/をつける。
-            - request path.substr(1)と繋げる際にwebservパスからの相対パスを表現、rootに絶対パスを指定されても同じ連結方法でアクセスできる
-                root: "..", request path: "/cgi/"の時 ../ + cgi/
-                root: "/", request path: "/cgi/"の時  / + cgi/
-            - best match Locationを見つける時にはrequest path のgetRawPath()を使用する
-        */
-        locationSetting["root"] += "/";
+    /*
+        - request pathの先頭には'/'が入っていなければBad Requestを返すという前提がある
+        - rootが設定されていない時には"."にする
+        - "document"や".."のときはそのまま使うが、末尾に"/"がつく時には取り除く
+        - request pathと繋げたときにwebservパスからの相対パスを表現するので、rootに絶対パスを指定されても同じ連結方法でアクセスできる
+            root: "..", request path: "/cgi/"の時 .. + /cgi/ -> "../cgi/"
+            root: "/", request path: "/cgi/"の時  "" + /cgi/ -> "/cgi/"
+        - best match Locationを見つける時にはrequest path のgetRawPath()を使用する
+    */
+    if(locationSetting.find("root") == locationSetting.end()){
+        setSetting("root", ".");
+        return ;
     }
+    std::string root = locationSetting["root"];
+    size_t len = root.length();
+    if(0 < len && root[len-1] == '/'){
+        locationSetting["root"] = root.substr(0, root.size() - 1);
+    }
+
 }
 
 void Location::confirmAllowMethod()

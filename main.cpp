@@ -1,5 +1,4 @@
 #include "config/Config.hpp"
-#include "request/RequestParse.hpp"
 #include "HttpConnection/HttpConnection.hpp"
 #include <sys/wait.h>
 
@@ -15,8 +14,9 @@ int main(int argc, char **argv){
     try{
         Config *conf = Config::getInstance(argv[1]);
         std::set<int> tcpSocketSet = conf->getTcpSockets();
-        HttpConnection* connection = HttpConnection::getInstance(tcpSocketSet);
-        connection->startEventLoop(conf);
+        // HttpConnection* connection = HttpConnection::getInstance(tcpSocketSet);
+        HttpConnection httpConnection(tcpSocketSet);
+        httpConnection.startEventLoop(conf);
     }catch(std::runtime_error& e){
         std::cerr << e.what() << std::endl;
         exit(1);
@@ -25,3 +25,4 @@ int main(int argc, char **argv){
         exit(1);
     }
 }
+

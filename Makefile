@@ -1,9 +1,11 @@
 CPPS =  config/utils.cpp \
 		config/Config.cpp \
 		config/VirtualServer.cpp config/Location.cpp \
-		request/RequestParse.cpp \
+		HttpMessage/HttpMessageParser.cpp \
+		HttpMessage/Request/Request.cpp \
+		HttpMessage/Response/Response.cpp \
+		HttpMessage/Response/autoindex.cpp \
 		HttpConnection/HttpConnection.cpp \
-		HttpConnection/autoindex.cpp \
 		HttpConnection/http_utils.cpp \
 		HttpConnection/post_delete_utils.cpp \
 		main.cpp
@@ -12,7 +14,7 @@ CGIS = cgi/test.cpp cgi/time.cpp cgi/loop.cpp
 
 CGIS_POST = cgi_post/upload.cpp cgi_post/upload2.cpp 
 
-COOKIE = request/userinfo.txt
+COOKIE = Cookie/userinfo.txt
 
 OBJS = $(CPPS:.cpp=.o)
 

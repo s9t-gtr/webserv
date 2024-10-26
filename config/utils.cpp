@@ -24,7 +24,7 @@ size_t prefixSpaceCount(std::string line){
 }
 void cutPrefixSpace(std::string& line){
     size_t i = 0;
-    while(line[i] == ' ' || line[i] == '\t'){
+    while(std::isspace(line[i])){
         i++;
     }
     line = line.substr(i);
