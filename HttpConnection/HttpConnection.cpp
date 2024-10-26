@@ -122,8 +122,8 @@ void HttpConnection::initProgressInfo(progressInfo *obj, SOCKET socket, int sndb
     obj->exit_status = 0;
     obj->eofTimer = false;
     obj->sndbuf = sndbuf;
-    obj->tmpKind = -1;
     obj->requestPath = "";
+    obj->isClose = false;
 }
 
 void HttpConnection::recvHandler(progressInfo *obj){
@@ -152,10 +152,12 @@ void HttpConnection::recvHandler(progressInfo *obj){
             obj->httpConnection->sendBadRequestPage(obj);
     }else if(bytesReceived == 0){
         // std::cerr << "close: socket: " << obj->socket << std::endl;
-        close(obj->socket);
-        delete obj;
+        if(obj != NULL){
+            close(obj->socket);
+            delete obj;
+        }
     }else
-        obj->httpConnection->sendInternalErrorPage(obj, RECV);
+        obj->wHandler = sendInternalErrorPage;
 }
 
 void HttpConnection::recvEofTimerHandler(progressInfo *obj){
@@ -194,19 +196,20 @@ void HttpConnection::readCgiHandler(progressInfo *obj, Config *conf){
             close(obj->pipe_c2p[R]);
         }
     }else
-        obj->httpConnection->sendInternalErrorPage(obj, NORMAL);
+        obj->wHandler = sendInternalErrorPage;
+        // obj->httpConnection->sendInternalErrorPage(obj, NORMAL);
 }
 
 void HttpConnection::sendCgiHandler(progressInfo *obj, Config *conf){
     (void)conf;
     // std::cerr << DEBUG << BLUE BOLD<< "Status: Send CGI" << RESET << std::endl;
-    obj->httpConnection->sendToClient(obj->buffer, obj, NORMAL);
+    obj->httpConnection->sendToClient(obj->buffer, obj);
 }
 
 void HttpConnection::sendLargeResponse(progressInfo *obj, Config *conf){
     (void)conf;
     // std::cerr << DEBUG << LIGHT_GREEN BOLD<< "Status: Large Response" << RESET << std::endl;
-    obj->httpConnection->sendToClient(obj->buffer, obj, obj->tmpKind);
+    obj->httpConnection->sendToClient(obj->buffer, obj);
 }
 
 
@@ -271,11 +274,15 @@ void HttpConnection::sendResponse(RequestParse& requestInfo, progressInfo *obj){
                 executeCgi(requestInfo, pipe_c2p);
             } else if(pid > 0) {
                 obj->childPid = pid;
+                // std::cerr << DEBUG << "obj->childPid: " << obj->childPid << std::endl;
                 createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
                 createNewEvent(obj->socket, EVFILT_TIMER, EV_ADD | EV_ONESHOT, 0, 10000, obj);
                 createNewEvent(pid, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, obj);
-            } else 
-                sendInternalErrorPage(obj, FORK);
+            } else {
+                close(pipe_c2p[R]);
+                close(pipe_c2p[W]);
+                sendInternalErrorPage(obj, NULL);
+            }
         }
         //その他の静的ファイルまたはディレクトリ
         else
@@ -329,5 +336,5 @@ void HttpConnection::confirmExitStatusFromCgi(progressInfo *obj){
         obj->wHandler = readCgiHandler;
         createNewEvent(obj->socket, EVFILT_WRITE, EV_ADD, 0, 0, obj);
     } else
-        obj->httpConnection->sendInternalErrorPage(obj, CGI_FAIL);
+        obj->httpConnection->sendInternalErrorPage(obj, NULL);
 }

@@ -28,7 +28,8 @@ void HttpConnection::sendBadRequestPage(progressInfo *obj)
     response += "\n";
     response += content;
 
-    sendToClient(response, obj, BAD_REQ);
+    obj->isClose = true;
+    sendToClient(response, obj);
 }
 
 void HttpConnection::sendForbiddenPage(progressInfo *obj)
@@ -45,7 +46,7 @@ void HttpConnection::sendForbiddenPage(progressInfo *obj)
     response += "\n";
     response += content;
 
-    sendToClient(response, obj, NORMAL);
+    sendToClient(response, obj);
 }
 
 void HttpConnection::sendNotAllowedPage(progressInfo *obj)
@@ -62,7 +63,7 @@ void HttpConnection::sendNotAllowedPage(progressInfo *obj)
     response += "\n";
     response += content;
 
-    sendToClient(response, obj, NORMAL);
+    sendToClient(response, obj);
 
 }
 
@@ -80,7 +81,7 @@ void HttpConnection::requestEntityPage(progressInfo *obj)
     response += "\n";
     response += content;
 
-    sendToClient(response, obj, NORMAL);
+    sendToClient(response, obj);
 }
 
 void HttpConnection::sendNotImplementedPage(progressInfo *obj)
@@ -97,15 +98,23 @@ void HttpConnection::sendNotImplementedPage(progressInfo *obj)
     response += "\n";
     response += content;
 
-    sendToClient(response, obj, NORMAL);
+    sendToClient(response, obj);
 }
 
 void HttpConnection::sendTimeoutPage(progressInfo *obj)
 {
+    createNewEvent(obj->childPid, EVFILT_PROC, EV_DELETE, NOTE_EXIT, 0, obj);
     obj->pHandler = NULL;
     // std::cerr << DEBUG << CYAN BOLD<< "Status: Time out : socket: " << obj->socket << RESET << std::endl;
-    kill(SIGKILL, obj->childPid);
-
+    // std::cerr << DEBUG << "kill() : obj->childPid: " << obj->childPid << std::endl;
+    int status;
+    if (waitpid(obj->childPid, &status, WNOHANG) == 0) {
+        // 子プロセスがまだ終了していない場合、強制終了を実行
+        // std::cerr << DEBUG << "Child process (PID: " << obj->childPid << ") exceeded timeout. Sending SIGKILL.\n" << std::endl;;
+        kill(obj->childPid, SIGKILL); // 強制終了
+        waitpid(obj->childPid, &status, 0); // 終了ステータスの回収
+        // std::cerr << DEBUG << "Child process (PID: " << obj->childPid << ") terminated.\n" << std::endl;;
+    }   
     // 504.htmlの内容を取得
     std::string content = getStringFromHtml("documents/504.html");
     std::string response;
@@ -118,11 +127,13 @@ void HttpConnection::sendTimeoutPage(progressInfo *obj)
     response += "\n";
     response += content;
 
-    obj->httpConnection->sendToClient(response, obj, CGI_FAIL);
+    obj->isClose = true;
+    obj->httpConnection->sendToClient(response, obj);
 }
 
-void HttpConnection::sendInternalErrorPage(progressInfo *obj, int kind)
+void HttpConnection::sendInternalErrorPage(progressInfo *obj, Config *conf)
 {
+    (void)conf;
     std::string content = getStringFromHtml("documents/500.html");
 
     std::string response;
@@ -134,8 +145,8 @@ void HttpConnection::sendInternalErrorPage(progressInfo *obj, int kind)
     response += "Content-Type: text/html\n";
     response += "\n";
     response += content;
-
-    sendToClient(response, obj, kind);
+    obj->isClose = true;
+    sendToClient(response, obj);
 }
 
 // GETのcgi関数と違うのはPOSTメソッドで届いたクライアントからのリクエストボディをexecveの引数に渡すところ
@@ -186,8 +197,11 @@ void HttpConnection::postProcess(RequestParse& requestInfo, progressInfo *obj)
         createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
         createNewEvent(obj->socket, EVFILT_TIMER, EV_ADD | EV_ONESHOT, 0, 10000, obj);
         createNewEvent(pid, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, obj);
-    } else 
-        sendInternalErrorPage(obj, FORK);
+    } else {
+        close(pipe_c2p[R]);
+        close(pipe_c2p[W]);
+        sendInternalErrorPage(obj, NULL);
+    }
 }
 
 void HttpConnection::deleteProcess(RequestParse& requestInfo, progressInfo *obj)
@@ -208,5 +222,5 @@ void HttpConnection::deleteProcess(RequestParse& requestInfo, progressInfo *obj)
     response += "Server: webserv/1.0.0\n";
     response += "\n";//ヘッダーとボディを分けるために、ボディが空でも必要
 
-    sendToClient(response, obj, NORMAL);
+    sendToClient(response, obj);
 }

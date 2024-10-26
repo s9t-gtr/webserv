@@ -1,6 +1,6 @@
 #include "HttpConnection.hpp"
 
-void HttpConnection::sendToClient(std::string response, progressInfo *obj, int kind){
+void HttpConnection::sendToClient(std::string response, progressInfo *obj){
     /*
         kind: 
             normal: 0 - 通信は切断しないしwriteイベントもまだ削除していない
@@ -8,53 +8,38 @@ void HttpConnection::sendToClient(std::string response, progressInfo *obj, int k
             bad_request: 2 - objをdeleteしつつsocketもcloseするので分岐が必要
     
     */
-    // std::cerr << DEBUG << "sendtoClient()" << std::endl;
+    std::cerr 
+    << DEBUG << "sendtoClient()" << std::endl;
     // std::cerr << DEBUG << GRAY << "======================= response =======================" << std::endl;
     // std::cerr << DEBUG << obj->buffer << RESET << std::endl;
     if((size_t)obj->sndbuf < response.length()){
         obj->buffer = response.substr(obj->sndbuf);
-        obj->tmpKind = kind;
+        // obj->tmpKind = kind;
         response = response.substr(0, obj->sndbuf);
         obj->wHandler = sendLargeResponse;
     }else
         obj->buffer = "";
     int status = send(obj->socket, response.c_str(), response.length(), 0);
-    if (status == 0){
+    if (status <= 0){
         perror("send error: client connection close");
-        kind = 2;
-    } 
-    else if (status < 0){
-        if(kind == SEND)//send()の失敗による kind=SENDときのsendInternalErrorPage()送信時のsend()でも失敗したら
-            kind = BAD_REQ;
-        else
-            sendInternalErrorPage(obj, SEND); 
+        close(obj->socket);
+        delete obj;
+        obj = NULL;
+        return ;
     }
     if(obj->buffer == ""){//largeResponse送信途中にobjをリセットしたくない
-        if(kind == FORK){
-            close(obj->pipe_c2p[R]);
-            close(obj->pipe_c2p[W]);
-        }
-        if(kind == BAD_REQ){//bad_requestする時にはsocketとobjを消すのでinitもreadイベント生成も不要
-            // std::cerr << DEBUG << "---- close: socket ----: " << obj->socket << std::endl;
+        if(obj->isClose){
             close(obj->socket);
             delete obj;
             obj = NULL;
-            return ;
         }
-        if(kind != RECV){ //recvの時はinitだけすれば良い
-            if(kind != CGI_FAIL){ //writeをaddする前にsendInternalErrirに入るのでDELETEしない
-                createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
-            }
+        else{
             createNewEvent(obj->socket, EVFILT_READ, EV_ADD, 0, 0, obj);
+            createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
+            obj->httpConnection->initProgressInfo(obj, obj->socket, obj->sndbuf);
         }
-        if(kind == CLOSE){
-            close(obj->socket);
-            delete obj;
-        }
-        obj->httpConnection->initProgressInfo(obj, obj->socket, obj->sndbuf);
-    }
-    
-        
+        return ;
+    }   
 }
 
 // サーバーからのレスポンスヘッダーに含まれるGMT時刻を取得する関数
@@ -80,7 +65,7 @@ void HttpConnection::sendRedirectPage(Location* location, progressInfo *obj)
     response += "Location: " + location->locationSetting["return"] + "\n";
     response += "\n";//ヘッダーとボディを分けるために、ボディが空でも必要
 
-    sendToClient(response, obj, NORMAL);
+    sendToClient(response, obj);
 
 }
 
@@ -114,7 +99,7 @@ void HttpConnection::sendDefaultErrorPage(VirtualServer* server, progressInfo *o
     response += "\n";
     response += content;
 
-    sendToClient(response, obj, NORMAL);
+    sendToClient(response, obj);
 }
 
 // サーバーからのレスポンスとして静的ファイルを送る関数
@@ -163,9 +148,9 @@ void HttpConnection::sendStaticPage(RequestParse& requestInfo, progressInfo *obj
     response += "\n";
     response += content;
     if(requestInfo.getHeader("Connection") == "close"){
-        return sendToClient(response, obj, CLOSE);
+        obj->isClose = true;
     }
-    sendToClient(response, obj, NORMAL);
+    sendToClient(response, obj);
 }
 
 bool HttpConnection::checkCompleteRecieved(progressInfo obj){
@@ -254,7 +239,7 @@ void HttpConnection::sendLoginPage(int status, RequestParse& requestInfo, progre
         response += "Location: " + redirectPath + "\n";
         response += "\n";
         response += "Login successful";
-        sendToClient(response, obj, NORMAL);
+        sendToClient(response, obj);
         return ;
     }
     std::string content = getStringFromHtml("documents/login.html");
@@ -267,7 +252,7 @@ void HttpConnection::sendLoginPage(int status, RequestParse& requestInfo, progre
     response += "Content-Type: text/html\n";
     response += "\n";
     response += content;
-    sendToClient(response, obj, NORMAL);
+    sendToClient(response, obj);
 }
 
 void HttpConnection::sendUserPage(std::vector<std::string> userInfo, int status, RequestParse& requestInfo, progressInfo *obj){
@@ -285,7 +270,7 @@ void HttpConnection::sendUserPage(std::vector<std::string> userInfo, int status,
         response += "\n";
         response += "Login successful";
 
-        sendToClient(response, obj, NORMAL);
+        sendToClient(response, obj);
         return ;
    }
    std::ifstream ifs("documents/user.html");
@@ -312,7 +297,7 @@ void HttpConnection::sendUserPage(std::vector<std::string> userInfo, int status,
     response += "Content-Type: text/html\n";
     response += "\n";
     response += content;
-    sendToClient(response, obj, NORMAL);
+    sendToClient(response, obj);
 }
 
 
