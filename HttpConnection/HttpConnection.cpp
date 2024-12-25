@@ -58,7 +58,7 @@ void my_usleep(useconds_t usec){
 void HttpConnection::startEventLoop(Config *conf){
     while(1){
         ssize_t nevent = kevent(kq, NULL, 0, eventlist, sizeof(*eventlist), &timeSpec);
-        my_usleep(2000);
+        // my_usleep(2000);
         for(ssize_t i = 0; i<nevent;i++){
             // std::cerr << DEBUG << BRIGHT_GREEN<< "<<<<<<<<<<<<<<< EVENT >>>>>>>>>>>>>>>" << RESET << std::endl;
             // std::cerr << DEBUG << "ident(socket or pid or timer): " << eventlist[i].ident << std::endl;
@@ -118,6 +118,7 @@ void HttpConnection::initProgressInfo(progressInfo *obj, SOCKET socket, int sndb
     obj->timerHandler = NULL;
     obj->processHandler = NULL;
     obj->socket = socket;
+    std::cout << "into socket : " << socket << std::endl;
     obj->exit_status = 0;
     obj->messageTimer = false;
     obj->cgiTimer = false;
@@ -200,6 +201,10 @@ void HttpConnection::cgiExitHandler(progressInfo *obj){
     if (WEXITSTATUS(status) == 0){ //cgi実行プロセスの正常終了
         obj->wHandler = readCgiHandler;
     } else {
+        char buf[1024];
+        ssize_t bytesReceived = read(obj->responseInfo.getPipefd(R), &buf, 1024);
+        if(0 < bytesReceived)
+            std::cout << std::string(buf, buf+bytesReceived) << std::endl;
         obj->responseInfo.createResponseFromStatusCode(500, obj->requestInfo);
         obj->wHandler = sendToClient;
 
@@ -305,7 +310,8 @@ void HttpConnection::sendToClient(progressInfo *obj){
         obj->wHandler = largeResponseHandler;
     }else
         isLargeResponse = false;
-
+    std::cout << "send() use socket : " << obj->socket << std::endl;
+    std::cout << "response: " << response << std::endl;
     int status = send(obj->socket, response.c_str(), response.length(), 0);
     if (status <= 0){
         // std::cerr << DEBUG << "---- send(): error ----: " << obj->socket << std::endl;
@@ -319,8 +325,8 @@ void HttpConnection::sendToClient(progressInfo *obj){
         if(statusCode == 400 || statusCode == 500 || obj->requestInfo.getField("Connection") == "close"){//bad_requestする時にはsocketとobjを消すのでinitもreadイベント生成も不要
             // std::cerr << DEBUG << "---- close: socket ----: " << obj->socket << std::endl;
             close(obj->socket);
-            obj = NULL;
             delete obj;
+            obj = NULL;
             return ;
         }
         // if(obj->sendKind != RECV){ //recvの時はinitだけすれば良い
@@ -329,10 +335,12 @@ void HttpConnection::sendToClient(progressInfo *obj){
         //     }
         // }
 
-        //次のリクエストに備える(bodyの不要なリクエストにbodyが入っていた場合、次のreadの先頭に来るのを実装するか否か迷い中)
+        //次のリクエストに備える(bodyの不要なリクエスト(GET methodを持つなど)にbodyが入っていた場合、次のreadの先頭に来るのを実装するか否か迷い中)
         createNewEvent(obj->socket, EVFILT_READ, EV_ADD, 0, 0, obj);
         createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
         obj->httpConnection->initProgressInfo(obj, obj->socket, obj->sndbuf);
+        obj->requestInfo.clean();
+        obj->responseInfo.clean();
     }   
 
 }

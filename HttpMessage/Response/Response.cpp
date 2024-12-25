@@ -261,10 +261,18 @@ ResponseType_t Response::createResponse(progressInfo *obj){
             return createResponseByCgi(obj);
         }
         return createResponseFromStatusCode(200, obj->requestInfo);
-    }else if(obj->requestInfo.getMethod() == "POST"){
-
+    }else if(obj->requestInfo.getMethod() == "POST" || obj->requestInfo.getMethod() == "DELETE"){
+        return createResponseByCgi(obj);
     }else if(obj->requestInfo.getMethod() == "DELETE"){
-
+        /*
+            nginxで動作確認したところ、ファイルとそれが入っているディレクトリの権限を持たせた上でlimit_exceptディレクティブを使用してもDELETEメソッドのリクエストには405 NOT ALLOWEDが返った。
+            調べてみるとnginxは静的ファイルに対するDELETEメソッドをサポートしていないので、バックエンドで削除する処理を実行する必要があるらしい:(https://stackoverflow.com/questions/71828435/nginx-delete-method-not-allowed)
+                ・・・ngx_http_dav_moduleというモジュールをインストールする方法もあるらしい(試してない)
+            CGI R
+            なお、Respons status codeはCGIスクリプトの実装に依存することになると考えられるため、ここでのresponse status codeは課題要件の範囲外となる。HTTPの常識の範囲内で返すことにする。
+        */
+        if (std::remove(obj->requestInfo.getPath().c_str()) != 0)// ファイルを削除
+            perror("remove error");
     }
     return STATIC_PAGE;
 }
@@ -288,22 +296,20 @@ ResponseType_t Response::createResponseByCgi(progressInfo *obj){
 }
 
 
+#include <fcntl.h>
 void Response::executeCgi(Request& requestInfo){
     close(pipe_c2p[R]);
     dup2(pipe_c2p[W],1);
     close(pipe_c2p[W]);
     extern char** environ;
     std::string path = requestInfo.getPath();
-    char* const cgi_argv[] = { const_cast<char*>(path.c_str()), NULL };
     const char* cPath = path.c_str();
-    if(execve(cPath, cgi_argv, environ) < 0)
+    std::cout << "cPath: " << cPath << std::endl;
+    char* const cgi_argv[] = { const_cast<char*>(cPath), NULL };
+    if(execve(cPath, cgi_argv, environ) < 0){
         exit(1);
+    }
 }
-
-
-
-
-
 
 
 /*
@@ -361,4 +367,10 @@ int Response::getPipefd(int RorW){
     if(RorW == W)
         return pipe_c2p[W];
     return 0;
+}
+
+void Response::clean() {
+    statusCode = 0;
+    response = "";
+    isReturn = false;
 }

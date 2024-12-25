@@ -1,6 +1,12 @@
 #include "Request.hpp"
 
 HttpMessageParser::DetailStatus::StartLineReadStatus Request::createInitialStatus() {
+    setReadingStatus(StartLine);
+
+    DetailStatus::StartLineReadStatus::RequestLineReadStatus requestLineReadStatus;
+    requestLineReadStatus = DetailStatus::StartLineReadStatus::SpaceBeforeMethod;
+    setDetailStatus(requestLineReadStatus);
+
     DetailStatus::StartLineReadStatus startLineStatus;
     startLineStatus.requestLineStatus = DetailStatus::StartLineReadStatus::SpaceBeforeMethod;
     return startLineStatus;
@@ -22,10 +28,7 @@ Request::Request(Config *config): HttpMessageParser(createInitialStatus()){
 //     setCorrespondLocation();
 // }
 
-Request::~Request(){
-    if(allocFlag)
-        delete location;
-}
+Request::~Request(){}
 
 
 
@@ -270,17 +273,14 @@ StatusCode_t Request::confirmRequest(){
 bool Request::isCgiRequest()
 {
     std::string::size_type pathLength = pathFromConfRoot.size();
-    std::string extension = "";
 
     if(pathFromConfRoot.find(".") == std::string::npos)
         return false;
-    for(std::string::size_type i = pathLength; i >= 0; i--){
-        extension = pathFromConfRoot[i] + extension;
-        if(extension.size() > 4)
-            break ;
-        if(extension == ".cgi" || extension == ".py")
-            return true;
-    }
+    if(pathFromConfRoot.substr(pathLength > 4 ? pathLength - 4 : 0) == ".cgi")
+        return true;
+    if(pathFromConfRoot.substr(pathLength > 2 ? pathLength - 2 : 0) == ".py")
+        return true;
+
     return false;
 }
 
@@ -301,19 +301,22 @@ StatusCode_t Request::validateRequestTarget(){
     // 対象がディレクトリであるか確認
     if (S_ISDIR(info.st_mode))
     {
-        // indexが設定されていたらそのファイルを出す
-        if (location->locationSetting["index"] != "none"){
+        // indexが設定されていたらそのファイルを出す。Location.cppのconfirmIndex()にてindexディレクティブが存在することは保証される
+        if (location->locationSetting["index"] != "off"){
             pathFromConfRoot = location->locationSetting["index"]; //confが指すindexがあることは保証される
             // autoindexがonであってもindexが優先される。confの順序は関係なし
         }
-        else if (location->locationSetting["autoindex"] == "on"){
+        else if (location->locationSetting["autoindex"] == "on" && location->locationSetting["index"] == "off"){ 
+            /*
+                ディレクトリリストを表示するにはconfにindex off;が必要で、index off;がない時にはindex index.html;が指定される <- nginx behavior
+            */
             isAutoindex = true;
             return 0;
         }
             // return sendAutoindexPage(obj->requestInfo, obj);
         // else
         //     return sendForbiddenPage(obj);//403エラー
-        if (location->locationSetting["index"] == "none" && location->locationSetting["autoindex"] != "on")
+        if (location->locationSetting["index"] == "off" && location->locationSetting["autoindex"] != "on")
             return 403;
     }
     if(isCgiRequest()){
@@ -583,6 +586,20 @@ bool Request::isAllowMethod(){
     return false;
 }
 
+void Request::clean(){
+    config = NULL;
+    requestTarget = "";
+    method = "";
+    version = "";
+    pathFromConfRoot = "";
 
-
-
+    isCgi = false;
+    isAutoindex = false;
+    // unsigned long long bodySize;
+    
+    server = NULL;
+    if(allocFlag) delete location;
+    else location = NULL;
+    allocFlag = false;
+    createInitialStatus();
+}

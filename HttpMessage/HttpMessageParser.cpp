@@ -198,8 +198,9 @@ void HttpMessageParser::parseBody(char c) {
     // }
     if(contentLength-- > 0)
         body += c;
-    else
+    if( !contentLength ) {
         setReadingStatus(Complete);
+    }
 }
 
 // void HttpMessageParser::bodyUnChunk(strVec linesVec, strVec::iterator itFromBody){

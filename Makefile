@@ -14,6 +14,7 @@ CGIS = cgi/test.cpp cgi/time.cpp cgi/loop.cpp
 
 CGIS_POST = cgi_post/upload.cpp cgi_post/upload2.cpp 
 
+COOKIE_DIR = Cookie
 COOKIE = Cookie/userinfo.txt
 
 OBJS = $(CPPS:.cpp=.o)
@@ -41,6 +42,7 @@ all: $(NAME) $(CGI_TARGETS) $(CGI_POST_TARGETS);
 
 $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) -o $(NAME)
+	mkdir -p Cookie
 	@touch $(COOKIE)
 
 clean: 

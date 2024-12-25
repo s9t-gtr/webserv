@@ -67,7 +67,7 @@ class HttpMessageParser{
             BodyReadStatus bodyStatus;
         };
     public:
-        HttpMessageParser(DetailStatus::StartLineReadStatus startLineReadStatuss);
+        HttpMessageParser(DetailStatus::StartLineReadStatus startLineReadStatus);
         virtual ~HttpMessageParser();
 
         void readBufferAndParse(char *buffer, size_t bytesReceived);

@@ -32,6 +32,8 @@ class Response: public HttpMessageParser{
         void setStatusCode(StatusCode_t setStatusCode);
         pid_t getPidfd();
         pid_t getPipefd(int RorW);
+
+        void clean();
         
     private:
         StatusCode_t statusCode;

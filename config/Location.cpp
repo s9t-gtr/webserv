@@ -50,7 +50,11 @@ void Location::confirmValuesLocation(){
 void Location::confirmIndex()
 {
     if(locationSetting.find("index") == locationSetting.end())
-        setSetting("index", "none");
+        return setSetting("index", "index.html");
+    else if (locationSetting["index"] == "\"\"") //index "";のように指定したとき 
+        locationSetting["index"] = "off";
+    else if  (locationSetting["index"] == "") 
+        locationSetting["index"] = "off";
 }
 
 void Location::confirmRoot()

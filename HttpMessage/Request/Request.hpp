@@ -40,6 +40,7 @@ class Request: public HttpMessageParser{
         vector<string> getUserInfo(string cookieInfo);
 
         StatusCode_t confirmRequest();
+        void clean();
     private: 
         void setConfigInfo();
         StatusCode_t validateRequestTarget();
@@ -57,7 +58,7 @@ class Request: public HttpMessageParser{
     
         //cookie/sessions
         string getSessionId(string cookieInfo);
-        
+    
     private:
         // Request-specific elements
         Config *config;
