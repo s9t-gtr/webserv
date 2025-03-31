@@ -117,6 +117,11 @@ bool isAppropriateDirectiveForBlock(std::string line, std::string usableDirectiv
 }
 
 std::vector<std::string> split(std::string str, char sep) {
+    /*
+        example:
+            str = "", sep = ' '
+                return -> "" (size=1)
+    */
    size_t first = 0;
    std::string::size_type last = str.find_first_of(sep);
    std::vector<std::string> result;

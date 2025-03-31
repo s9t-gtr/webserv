@@ -14,7 +14,7 @@ Config::Config(std::string configPath){
 Config::~Config(){}
 
 std::string Config::httpDirectives_[] = {""};
-std::string Config::serverDirectives_[] = {"cgi_path", "server_name", "client_max_body_size", "error_page", "listen", ""};
+std::string Config::serverDirectives_[] = { "server_name", "client_max_body_size", "error_page", "listen", ""};
 std::string Config::locationDirectives_[] = {"index", "root", "allow_method", "autoindex", "return", ""};
 
 /*========================================
@@ -50,17 +50,25 @@ void Config::readConfig(Config *inst){
     if(!ifs)
         throw std::runtime_error("Error: " + inst->configPath_ + " open failed"); 
     exploreHttpBlock(&ifs);
+	//NOTICE : ifs.close()?
+	
 }
 
 
 SOCKET tcpListen(std::string port){
-
         struct addrinfo hints;
         struct addrinfo *result = NULL;
         SOCKET sockfd;
         
         memset(&hints, 0, sizeof(hints));
-        hints.ai_family = AF_INET6;
+        /*
+            AF_INETにすることでIPv4のみ対応。
+            IPv6も対応しようとすると
+            - http://0:0:0:0:0:0:0:1:80
+            - http://[::1]:80
+            などのリクエストにも適切にconfigを割り当てる必要がありちょっと大変
+        */
+        hints.ai_family = AF_INET;  
         hints.ai_socktype = SOCK_STREAM; // TCPソケット
         hints.ai_flags = AI_PASSIVE;
 
@@ -144,6 +152,17 @@ void Config::exploreHttpBlock(std::ifstream *ifs){
                 throw std::runtime_error("Error: Invalid directive");
         }
     }
+	confirmDefaultServer();
+}
+
+void Config::confirmDefaultServer(){
+	if(servers_.empty())
+		throw std::runtime_error("Error: server block not found");
+	for(serversMap::iterator it = servers_.begin();it != servers_.end();it++){
+		if(it->second->isDefault)
+			return;
+	}
+	servers_.begin()->second->isDefault = true;
 }
 
 void Config::setServer(std::string serverName, VirtualServer *server){
@@ -226,17 +245,33 @@ void Config::exploreLocationBlock(VirtualServer *server, std::ifstream *ifs, std
         }
     }
     location->confirmValuesLocation();
-    server->setLocation(location->getLocationPath(), location);
+    server->setLocation(location->path, location);
 }
 
 
 
 VirtualServer* Config::getServer(const std::string serverName){
     if(servers_.find(serverName) == servers_.end())
-        return NULL;
+        return getDefaultServer();
     return (servers_[serverName]);
 }
 
+serversMap Config::getServerByPort(const std::string port){
+	serversMap map;
+	for(serversMap::iterator it = servers_.begin();it != servers_.end();it++){
+		if(it->second->getListenPort() == port)
+			map[it->first] = it->second;
+	}
+	return map;
+}
+
+VirtualServer* Config::getDefaultServer(){
+	for(serversMap::iterator it = servers_.begin();it != servers_.end();it++){
+		if(it->second->isDefault)
+			return it->second;
+	}
+	throw std::runtime_error("Error: default server not found");
+}
 serversMap Config::getSamePortListenServers(std::string port, serversMap &map){
     for(serversMap::const_iterator it = servers_.begin(); it != servers_.end(); it++){
         if(it->second->getListenPort() == port)

@@ -9,8 +9,7 @@ JST = timezone(timedelta(hours=9))
 current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
 
 print("Content-Type: text/html")  # 必須のHTTPヘッダー
-print()  # 空行でヘッダーと本文を分ける
-print(f"""
+print("""
 <!DOCTYPE html>
 <html lang="en">
 <head>

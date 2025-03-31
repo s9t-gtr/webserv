@@ -17,6 +17,14 @@
 
 typedef std::map<std::string, std::string> HeadersMap;
 
+enum ChunkedStatus{
+	ChunkSize,
+	ChunkData,
+	ChunkCRLF,
+	ChunkTrailer,
+	ChunkEndCRLF
+};
+
 class HttpMessageParser{
     public:
         enum ReadingStatus{
@@ -77,7 +85,7 @@ class HttpMessageParser{
         void parseHeaderContentLength();
         void parseBody(char c);
 
-        // void bodyUnChunk(vector<string> linesVec, std::vector<string>::iterator itFromBody);
+		void bodyUnChunk(char c);
         
         virtual void checkIsWatingLF(char c, bool isExistThirdElement) = 0;
 
@@ -120,6 +128,11 @@ class HttpMessageParser{
         std::string::size_type contentLength;
 
         unsigned int responseStatusCode;
+
+        ChunkedStatus chunkedStatus;
+        std::string chunkSizeString;
+        long long chunkSize;
+        bool isAfterSize;
 };
 
 class BadRequest_400: public std::invalid_argument{
@@ -139,5 +152,18 @@ class NotAllowed_405: public std::invalid_argument{
         NotAllowed_405(const char* error_message);
         const char* what() const throw();
 };
+
+class BadCgiResponse: public std::invalid_argument{
+    public:
+        BadCgiResponse(const char* error_message);
+        const char* what() const throw();
+};
+
+class BadGateway_502: public std::invalid_argument{
+    public:
+        BadGateway_502(const char* error_message);
+        const char* what() const throw();
+};
+
 
 #endif

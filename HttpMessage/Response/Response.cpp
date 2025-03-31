@@ -15,32 +15,69 @@ Response::Response(): HttpMessageParser(createInitialStatus()){
 
 Response::~Response(){}
 
+bool determineResponseTypeByHttpVersion(std::string tmpHttpVersion);
 void Response::parseStartLine(char c){
     /*
         cがasciiであることは保証されている
+
+        CGI Responseが不正の時は502を返すが、不正の条件はRequestの時と異なることに注意
+            HTTP Resposneとして不完全なCGI Responseをnginxが補完して正しく返すケースがある
+             - [ header, body ] -> status lineを補完？ brawserが解釈？
+             - [ startline, body ] -> serverがヘッダ補完
+             - contentlengthの有無
+                - 有 Content-Length: (x >= 1) && bodyなし -> 1分待機後fail(response statusCodeなしのエラー扱い)
+                - 有 Content-Length: (x < bodyLength) && bodyあり -> 設定した文字数分はbodyを送信できるが、15秒ほどserver内部で続きのCGI Respnoseを待つ
+                - 無 && bodyあり -> 全てclientに送信される
+                - 
+            - [ body ] -> 502
+		
     */
+    if(!isascii(c)){
+        syntaxErrorDetected();
+    }
     switch(getDetailStatus().startLineStatus.statusLineStatus){
         case DetailStatus::StartLineReadStatus::SpaceBeforeHttpVersion:
             if(std::isspace(c)){
                 if(c == CHAR_CR || c == CHAR_LF) // nginx behavior
                     return ;
                 else
-                    throw BadRequest_400("error");
+                    throw BadCgiResponse("error");
             }
             toTheNextStatus();
-            // httpVersion += c;
+            httpVersion += c;
             break;
         case DetailStatus::StartLineReadStatus::HttpVersion:
             if(std::isspace(c)){
                 if(c == ' '){ // nginx behavior
-                    // if(isAllowMethod())
-                        // throw NotAllowed_405("error");
-                    toTheNextStatus();
-                }else{
-                    throw BadRequest_400("error");
+                    /*
+                        この空白はHeader Fieldの区切り文字かもしれないため、httpVersionの要件を満たすか確認する
+                        httpVersionではなかった場合、status lineなしのCGI Responseだと判断できるため、これまでのものは破棄してReadingStatusをHeadersとしてパースし直す
+                    */
+                    if(determineResponseTypeByHttpVersion(httpVersion)) {
+                        toTheNextStatus();
+                        return ;
+                    }
+                    httpVersion = "";
+                    setReadingStatus(Headers);
+                    setDetailStatus(DetailStatus::FirstLineForbiddenSpace);
+                    return ;
+                }
+                else if(c == CHAR_CR) {
+                    /*
+                        空白が来てtoTheNextStatusが来る前にCRが来た場合、status lineなしのCGI Responseだと判断できる
+                            - "Content-Length:5\r\n"などheader fieldの空白がないこともあるため
+                        LFまで読み込んでhttpVersionだったものにparseHeader()を通すReadingStatusをHeadersとしてパースし直す
+                    */
+                    httpVersion = "";
+                    setReadingStatus(Headers);
+                    setDetailStatus(DetailStatus::FirstLineForbiddenSpace);
+                    return ;
+                }
+                else{
+                    throw BadCgiResponse("error");
                 }
             }
-            // method += c;
+            httpVersion += c;
             break;
         case DetailStatus::StartLineReadStatus::SpaceBeforeStatusCode:
             if(std::isspace(c)){
@@ -108,7 +145,7 @@ void Response::parseStartLine(char c){
                     return ;
                 }else if(c == CHAR_CR){
                     setIsWatingLF(true);
-                    toTheNextStatus();
+                    toTheNextStatus(); //NOTICE: どうなる？
                     return ;
                 }else if(c == CHAR_LF){
                     setReadingStatus(Headers);
@@ -151,8 +188,36 @@ void Response::checkIsWatingLF(char c, bool isExistThirdElement){
             return ;
         }
         else
-            throw BadRequest_400("error");
+            throw BadGateway_502("error");
     }
+}
+
+bool determineResponseTypeByHttpVersion(std::string tmpHttpVersion) {
+    /*
+	ClientへのResponseとして、HTTP Responseを返すのかHTMLファイルを返すかを決定する関数
+     */
+    if(!tmpHttpVersion.size()) { //throw std::runtime_error("先頭の空白を事前に削除できていない"); }
+	return false;
+    }
+    if(tmpHttpVersion[0] == 'H') { return true; } //一文字目がHならHTTP Responseを返すことができる
+						  //
+    if(tmpHttpVersion.size() >= 5) { return false; }
+    if(tmpHttpVersion.substr(0, 5) != "HTTP/") { return false; }
+    if(tmpHttpVersion.size() < 7) { return false; }
+    std::string version = tmpHttpVersion.substr(6);
+    std::string::size_type commaIndex = version.find(".");
+    if( commaIndex == std::string::npos ) { return false; }
+    //NOTICE: .の存在は確認したが数値チェック省略
+    // std::vector<std::string> splitByComma = split(version, '.');
+    // if (splitByComma.size() != 2) { return false; }
+    // for(std::vector<std::string>::iterator it=splitByComma.begin(); it!=splitByComma.end(); it++){
+    //     std::ostringstream oss;
+    //     oss << *it;
+    //     /*
+    //         詳しいversion数値チェックの挙動不明
+    //     */
+    // }
+    return true;
 }
 
 
@@ -167,6 +232,9 @@ ResponseType_t Response::createResponseFromStatusCode(StatusCode_t statusCode, R
             statusLine += "200 0K\r\n";
             filePath = requestInfo.getPath();
             break;
+        case 301:
+            statusLine += "301 Moved Permanently\r\n";
+            filePath += "301.html";
         case 302:
             statusLine += "302 Moved Temporarily\r\n";
             filePath += "302.html";
@@ -182,7 +250,7 @@ ResponseType_t Response::createResponseFromStatusCode(StatusCode_t statusCode, R
             break;
         case 404:
             statusLine += "404 Not Found\r\n";
-            filePath += "404.html";
+            filePath = requestInfo.getServer()->serverSetting["error_page"];
             break;
         case 405:
             statusLine += "405 Not Allowed\r\n";
@@ -192,6 +260,10 @@ ResponseType_t Response::createResponseFromStatusCode(StatusCode_t statusCode, R
             statusLine += "413 Request Entity Too Large\r\n";
             filePath += "413.html";
             break;
+		case 414:
+			statusLine += "414 Request-URI Too Long\r\n";
+			filePath += "414.html";
+			break;
         case 500:
             statusLine += "500 Internal Server Error\r\n";
             filePath += "500.html";
@@ -200,11 +272,18 @@ ResponseType_t Response::createResponseFromStatusCode(StatusCode_t statusCode, R
             statusLine += "501 Not Implemented\r\n";
             filePath += "501.html";
             break;
+        case 502:
+            statusLine += "502 Bad Gateway\r\n";
+            filePath += "502.html";
+            break;
         case 504:
             statusLine += "504 Gateway Timeout\r\n";
             filePath += "504.html";
             break;
-
+		case 505:
+			statusLine += "505 HTTP Version Not Supported\r\n";
+			filePath += "505.html";
+			break;
     }
     response += statusLine;
     std::string html;
@@ -214,6 +293,10 @@ ResponseType_t Response::createResponseFromStatusCode(StatusCode_t statusCode, R
         html = getHtml(filePath);
     response += createHeaders(headers, html.size(), requestInfo) + "\r\n";
     response += html;
+    
+    if (requestInfo.getRequestTarget() != "" && !determineResponseTypeByHttpVersion(requestInfo.getVersion())) {
+	response = html; // TODO: 確かにここでresponseをhtmlだけにする処理は欲しいけど、Versionの頭文字が'H'なら400 http responseを返さないといけないので、ここにくるまでにVersionを見てreturn 400とする関数がRequest.cppに必要
+    }
     return STATIC_PAGE;
 }
 
@@ -248,6 +331,7 @@ std::string Response::createHeaders(std::vector<std::string> needHeaders, std::s
 }
 
 ResponseType_t Response::createResponse(progressInfo *obj){
+	std::cerr << "content-type" << obj->requestInfo.getField("content-type") << std::endl;
     statusCode = obj->requestInfo.confirmRequest();
     if(statusCode){ //already set 
         return createResponseFromStatusCode(statusCode, obj->requestInfo);
@@ -278,38 +362,228 @@ ResponseType_t Response::createResponse(progressInfo *obj){
 }
 
 ResponseType_t Response::createResponseByCgi(progressInfo *obj){
+    if(pipe(pipe_p2c) < 0)
+        throw std::runtime_error("Error: pipe() failed");
     if(pipe(pipe_c2p) < 0)
         throw std::runtime_error("Error: pipe() failed");
     pid_t pid = fork();
     if(pid == 0){
-        executeCgi(obj->requestInfo);
+        executeCgi(obj);
     } else if(pid > 0) {
-        pidfd = pid;
+		pidfd = pid;
+		close(pipe_p2c[R]); // 子の読み取り側を閉じる
+   		ssize_t written_byte = write(pipe_p2c[W], obj->requestInfo.getBody().c_str(), obj->requestInfo.getContentLength()); // POSTデータを書き込む
+   		close(pipe_p2c[W]); // データを書き終わったら閉じる
+		std::cerr << "written_byte: " << written_byte << std::endl;
         return CGI;
     } else { //fork失敗
         // sendInternalErrorPage(obj);
         close(pipe_c2p[R]);
         close(pipe_c2p[W]);
+        close(pipe_p2c[R]);
+        close(pipe_p2c[W]);
         return createResponseFromStatusCode(500, obj->requestInfo);
     }
     return CGI;
 }
 
 
-#include <fcntl.h>
-void Response::executeCgi(Request& requestInfo){
+void Response::executeCgi(progressInfo *obj){
+	close(pipe_p2c[W]);
+	dup2(pipe_p2c[R], 0);
+	close(pipe_p2c[R]);
+
     close(pipe_c2p[R]);
     dup2(pipe_c2p[W],1);
     close(pipe_c2p[W]);
-    extern char** environ;
-    std::string path = requestInfo.getPath();
-    const char* cPath = path.c_str();
+    Request& requestInfo = obj->requestInfo;
+    std::string script = requestInfo.getPath();
+    if(script.size() > 3 && script.substr(0, 2) == "./") {
+        script = script.substr(2);
+    }
+    extern char **environ;
+    createEnviron(obj, environ);
+    // std::cerr << "=== Environment Variables Before execve ===\n";
+    // for (char **env = obj->holdMetaVariableEnviron; *env; ++env) {
+    //     std::cerr << *env << std::endl;
+    // }
+    // std::cerr << "===========================================\n";
+    // std::cerr << script << std::endl;
+    if(script.substr(script.length() - 3) == ".py"){
+		const char* script_c = script.c_str();
+        char* const cgi_argv[] = { NULL };
+        if(execve(script_c, cgi_argv, obj->holdMetaVariableEnviron) < 0){
+			perror("execve");
+            exit(1);
+		}
+    }
+    const char* cPath = script.c_str();
     std::cout << "cPath: " << cPath << std::endl;
     char* const cgi_argv[] = { const_cast<char*>(cPath), NULL };
-    if(execve(cPath, cgi_argv, environ) < 0){
+    if(execve(cPath, cgi_argv, obj->holdMetaVariableEnviron) < 0){
         exit(1);
     }
 }
+
+
+
+std::vector<std::string> splitBody(std::string httpMessage) {
+    std::vector<std::string> result;
+    std::string::size_type pos = httpMessage.find("\r\n\r\n");
+    if (pos) {
+        result.push_back(httpMessage.substr(0, pos));
+        result.push_back(httpMessage.substr(pos+1));
+        return result;
+    }
+    pos = httpMessage.find("\n\n");
+    if (pos) {
+        result.push_back(httpMessage.substr(0, pos));
+        result.push_back(httpMessage.substr(pos+1));
+        return result;
+    }
+    result.push_back(httpMessage);
+    return result;
+}
+
+std::vector<std::string> getLines(std::string startLineOrHeaders) {
+    /*
+        startLineOrHeaders means [ startLine || Headers ]
+            contain only startline, or only Headers 
+    */
+    std::string::size_type size = startLineOrHeaders.size();
+    std::vector<std::string> result;
+    for (std::string::size_type i=0; i<size; i++){
+        std::string::size_type pos = startLineOrHeaders.find(CRLF, i);
+        if (pos) {
+            result.push_back(startLineOrHeaders.substr(i, pos));
+            i = pos + string(CRLF).size();
+            continue;
+        }
+        pos = startLineOrHeaders.find(STR_LF, i);
+        if (pos) {
+            result.push_back(startLineOrHeaders.substr(i, pos));
+            i = pos + string(STR_LF).size();
+        }
+    }
+    return result;
+}
+
+bool isStatusLine(std::string firstLine) {
+    /*
+        case of return true, firstLine have 3 elements
+            first: 
+                HTTP version
+            second:
+                status code 
+            third:
+                reason phrase
+    */
+	(void)firstLine;
+    return false;
+}
+
+
+std::vector<HttpMessageParser::ReadingStatus> Response::getCgiResponseComponents(std::string cgiResponse){
+    std::vector<ReadingStatus> result;
+    std::string::size_type responseSize = cgiResponse.size();
+
+    if (!responseSize) { return result; }
+    
+    std::vector<std::string> splitBodyResponse = splitBody(cgiResponse);
+
+
+    std::vector<std::string> linesOfStartLineOrHeaders = getLines(splitBodyResponse[0]);
+    if (isStatusLine(linesOfStartLineOrHeaders[0])) {
+        result.push_back(StartLine);
+    }
+    bool isHasStatusLine = std::find(result.begin(), result.end(), StartLine) != result.end();
+    if (isHasStatusLine && linesOfStartLineOrHeaders.size() > 1 ) {
+        result.push_back(Headers);
+    } else if (!isHasStatusLine && linesOfStartLineOrHeaders.size() > 0) {
+        result.push_back(Headers);
+    }
+    if(splitBodyResponse.size() > 1) {
+        result.push_back(Body);
+    }
+
+    return result;
+    
+    
+}
+
+bool Response::checkCgiResponseSyntax(std::string cgiResponse) {
+    /*
+        return false条件
+        - header fieldが1行もない
+    */
+
+   	(void)cgiResponse; 
+    return true;
+}
+
+
+
+// void store(progressInfo *obj, size_t i) {
+
+// }
+
+#include "MetaVariables.hpp"
+
+
+void Response::createEnviron(progressInfo *obj, char **environ){
+    MetaVariables metaVariables;
+
+    size_t i = 0;
+    numEnvironLine = 0;
+    while(environ[i++] != NULL){
+        numEnvironLine++;
+    }
+    obj->holdMetaVariableEnviron = (char **)std::malloc((numEnvironLine + metaVariables.count() + 1) * sizeof(char *));
+    i = 0;
+    while(i < numEnvironLine){
+        obj->holdMetaVariableEnviron[i] = strdup(environ[i]);
+        i++;
+    }
+    for (std::map<std::string, EnvironFunction>::iterator it = metaVariables.variablesToFuncPtr.begin(); it!=metaVariables.variablesToFuncPtr.end(); it++){
+        it->second(obj, i++);
+    }
+    obj->holdMetaVariableEnviron[i] = NULL;
+    
+}
+// void Response::createEnviron(progressInfo *obj, char **environ){
+//     size_t numEnvironLine = 0;
+//     while (environ[numEnvironLine] != NULL) {
+//         numEnvironLine++;
+//     }
+
+//     // HOGE=hoge を追加するため +2 (HOGE + NULL)
+//     obj->holdMetaVariableEnviron = (char **)malloc((numEnvironLine + 2) * sizeof(char *));
+//     if (!obj->holdMetaVariableEnviron) {
+//         perror("malloc failed");
+//         exit(1);
+//     }
+
+//     // 既存の環境変数をコピー
+//     size_t i = 0;
+//     for (; i < numEnvironLine; i++) {
+//         obj->holdMetaVariableEnviron[i] = strdup(environ[i]);
+//         if (!obj->holdMetaVariableEnviron[i]) {
+//             perror("strdup failed");
+//             exit(1);
+//         }
+//     }
+
+//     // HOGE=hoge を追加
+//     obj->holdMetaVariableEnviron[i] = strdup("HOGE=hoge");
+//     if (!obj->holdMetaVariableEnviron[i]) {
+//         perror("strdup failed");
+//         exit(1);
+//     }
+
+//     // NULL 終端
+//     obj->holdMetaVariableEnviron[i + 1] = NULL;
+// }
+
 
 
 /*

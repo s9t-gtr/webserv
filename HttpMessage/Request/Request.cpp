@@ -15,6 +15,8 @@ HttpMessageParser::DetailStatus::StartLineReadStatus Request::createInitialStatu
 Request::Request(Config *config): HttpMessageParser(createInitialStatus()){
     this->config = config;
     isAutoindex = false;
+    isQueryString = false;
+	startLineLength = 0;
     // bodySize = 0;
 }
 // Request::Request(string requestMessage, Config *conf): allocFlag(false){
@@ -106,9 +108,15 @@ void convertCarriageReturnToSpace(string &line){
 // }
 
 void Request::parseStartLine(char c){
-    /*
-        cがasciiであることは保証されている
-    */
+   if(!isascii(c)){
+        syntaxErrorDetected();
+    }
+	startLineLength += 1;
+	if (startLineLength > 8192) {
+		std::cout << "startLineLength: " << startLineLength << std::endl;
+		syntaxErrorDetected(414);
+		return;
+	}
     switch(getDetailStatus().startLineStatus.requestLineStatus){
         case DetailStatus::StartLineReadStatus::SpaceBeforeMethod:
             if(std::isspace(c)){
@@ -145,6 +153,11 @@ void Request::parseStartLine(char c){
             break;
         case DetailStatus::StartLineReadStatus::RequestTarget:
             if(isspace(c)){
+				if(requestTarget.size() > 0 && requestTarget[0] != '/'){
+					requestTarget = "";
+					syntaxErrorDetected();
+                    setReadingStatus(Complete);
+				}
                 if(c == ' '){
                     toTheNextStatus();
                     return ;
@@ -163,7 +176,16 @@ void Request::parseStartLine(char c){
                 else
                     syntaxErrorDetected(302); //nginx behavior
             }
+            if (c == '?') { 
+                isQueryString = true; 
+                return ;
+            }
+            if (isQueryString) {
+                queryString += c;
+                return ;
+            }
             requestTarget += c;
+            
             break;
         case DetailStatus::StartLineReadStatus::SpaceBeforeVersion:
             checkIsWatingLF(c, NOT_EXIST_VERSION);
@@ -183,15 +205,15 @@ void Request::parseStartLine(char c){
                 else
                     syntaxErrorDetected(302);
             }
-            if(c == 'H'){
-                toTheNextStatus();
-                version += c;
-                return ;
-            }
-            if(c == '%')
-                syntaxErrorDetected();
-            syntaxErrorDetected(302);
-            break;
+			//if(c == 'H'){
+            toTheNextStatus();
+            version += c;
+            return ;
+           // }
+           // if(c == '%')
+           //     syntaxErrorDetected();
+           // syntaxErrorDetected(302);
+           // break;
         case DetailStatus::StartLineReadStatus::Version:
             if(std::isspace(c)){
                 if(c == ' '){
@@ -254,6 +276,8 @@ void Request::setConfigInfo(){
 }
 
 StatusCode_t Request::confirmRequest(){
+	if(getResponseStatusCode() == 414) return 414;
+	if(getField("host") == "") return 400;
     setConfigInfo();
     if(getSyntaxErrorDetected()){
         if(getResponseStatusCode() == 302)
@@ -266,19 +290,26 @@ StatusCode_t Request::confirmRequest(){
             return 400;
         return 405;
     }
-
-    return validateRequestTarget();
+	//requestTargetがどんなパターンの不正なリクエストでも、HttpVersionの先頭が'H'かつ不正な場合はそれに応じたStatusCodeのレスポンスを返す
+	//HttpVersionの先頭が'H'でない場合、その文字列をrequestTargetの一部として扱うため、validateRequestTarget()の結果に従う
+	StatusCode_t validateHttpVersionResult = validateHttpVersion();
+	if (validateHttpVersionResult != 0) { 
+		return validateHttpVersionResult; 
+	}
+	StatusCode_t validateRequestTargetResult = validateRequestTarget();
+    return validateRequestTargetResult;
 }
 
 bool Request::isCgiRequest()
 {
     std::string::size_type pathLength = pathFromConfRoot.size();
-
+    const std::string pythonExtension = ".py";
+    const std::string cgiExtension = ".cgi";
     if(pathFromConfRoot.find(".") == std::string::npos)
         return false;
-    if(pathFromConfRoot.substr(pathLength > 4 ? pathLength - 4 : 0) == ".cgi")
+    if(pathFromConfRoot.substr(pathLength > cgiExtension.size() ? pathLength - cgiExtension.size() : 0) == cgiExtension)
         return true;
-    if(pathFromConfRoot.substr(pathLength > 2 ? pathLength - 2 : 0) == ".py")
+    if(pathFromConfRoot.substr(pathLength > pythonExtension.size() ? pathLength - pythonExtension.size() : 0) == pythonExtension)
         return true;
 
     return false;
@@ -296,14 +327,31 @@ StatusCode_t Request::validateRequestTarget(){
     */
    struct stat info;
     // 対象のファイル,ディレクトリの存在をチェックしつつ、infoに情報を読み込む
-    if (stat(pathFromConfRoot.c_str(), &info) != 0)
-        return 302;
+	
+   	//parse時requestTarget読み取り時点で不正が発覚した場合はversionの有無,正誤に関わらず400を返す.
+   	if (requestTarget == "") { return 400; }
+    if (stat(pathFromConfRoot.c_str(), &info) != 0) {
+		//設定されたerror_pageが存在しない場合は302
+        if (stat(getServer()->serverSetting["error_page"].c_str(), &info) != 0){
+            return 302;
+        }
+        return 404;
+    }
+	
+       
+	
     // 対象がディレクトリであるか確認
     if (S_ISDIR(info.st_mode))
     {
+		if (method == "POST")
+			return 403;
+		//Directoryなのに末尾に/がない場合は404, 404がない時は301
+		if (pathFromConfRoot[pathFromConfRoot.size() - 1] != '/'){
+			return 301;
+		}
         // indexが設定されていたらそのファイルを出す。Location.cppのconfirmIndex()にてindexディレクティブが存在することは保証される
         if (location->locationSetting["index"] != "off"){
-            pathFromConfRoot = location->locationSetting["index"]; //confが指すindexがあることは保証される
+            pathFromConfRoot = location->locationSetting["index"]; //confが指すindexがあることは保証されている
             // autoindexがonであってもindexが優先される。confの順序は関係なし
         }
         else if (location->locationSetting["autoindex"] == "on" && location->locationSetting["index"] == "off"){ 
@@ -319,24 +367,112 @@ StatusCode_t Request::validateRequestTarget(){
         if (location->locationSetting["index"] == "off" && location->locationSetting["autoindex"] != "on")
             return 403;
     }
-    if(isCgiRequest()){
-        isCgi = true;
-        if (access(pathFromConfRoot.c_str(), X_OK))
-            return 403;
-    }
-    if (server->serverSetting.find("client_max_body_size") != server->serverSetting.end())
+	if (server->serverSetting.find("client_max_body_size") != server->serverSetting.end())
     {
         std::istringstream iss(server->serverSetting["client_max_body_size"]);
         unsigned long long number;
         iss >> number;
+		std::cout << "number: " << number << std::endl;
         if (getContentLength() > number)
             return 413;// return requestEntityPage(obj);
     }
+    if(isCgiRequest() || method == "POST"){
+        isCgi = true;
+        if (access(pathFromConfRoot.c_str(), X_OK) != 0)
+            return 403;
+    }
+    
     if(!isCgi && (method == "POST" || method == "DELETE"))   
         return 405;
+	if(access(pathFromConfRoot.c_str(), R_OK) != 0) {
+		return 403;
+	}
     return 0;
 }
 
+std::string removeLeadingZeros(const std::string& str);
+StatusCode_t getUntilNotDigitStatus(std::string major) ;
+StatusCode_t Request::validateHttpVersion(){
+	if(version == "") { return 0; }
+	if(version.size() > 0 && version[0] != 'H') { 
+		pathFromConfRoot += version;
+		return 0; 
+	}
+	if(version.size() < 5) { return 400; }
+    if(version.substr(0, 5) != "HTTP/") { return 400; }
+    if(version.size() < 7) { return 400; }
+    std::string digits = version.substr(5);
+	if(digits[digits.size() - 1] == '.') { return 400; }
+    std::string::size_type commaIndex = digits.find(".");
+    if( commaIndex == std::string::npos ) { return 400; }
+    //NOTICE: .の存在は確認したが数値チェック省略
+	
+    std::vector<std::string> splitByComma = split(digits, '.');
+    if (splitByComma.size() != 2) { return 400; }
+
+    for(size_t i = 0; i < splitByComma.size(); i++){
+		//istringstreamは先頭の符号を読み取ってしまうので事前に弾く
+		if( splitByComma[i].size() > 0 && (splitByComma[i][0] == '+' || splitByComma[i][0] == '-')) {
+			return 400; 
+		}
+		//major
+		if (i == 0) {
+			/*
+			 	majorはprefixの0を許容しない。
+			 */
+			if( splitByComma[i].find_first_not_of('0') != 0) { return 400; }
+			//999aのとき505を返したい
+			StatusCode_t untilNotDigitStatus = getUntilNotDigitStatus(splitByComma[i]);
+			if (untilNotDigitStatus != 0) { return untilNotDigitStatus; }
+			std::istringstream iss(splitByComma[i]);
+    	    int number;
+			if (!(iss >> number) || !iss.eof()) {
+				//int型でoverflowする値や文字が入っている場合
+				return 400;
+			}
+			if (number >= 2) { 
+				return 505; 
+			}
+		}
+		//minor
+		if (i == 1) {
+			/*
+				//minorはprefixの0を許容する。それらを省略して3桁以内の数値ならVersionとして成立する
+			 */
+			std::istringstream iss(splitByComma[i]);
+    	    int number;
+			if (!(iss >> number) || !iss.eof()) {
+				//int型でoverflowする値や文字が入っている場合
+				return 400;
+			}
+			if (number > 999) { return 400; }
+		}
+    }
+	return 0;
+}
+
+std::string removeLeadingZeros(const std::string& str) {
+    size_t pos = str.find_first_not_of('0'); // '0' 以外の最初の位置を探す
+    if (pos == std::string::npos) {
+        return "0"; // すべて '0' なら "0" を返す
+    }
+    return str.substr(pos);
+}
+
+StatusCode_t getUntilNotDigitStatus(std::string major) {
+	std::string untilNotDigit = "";
+	for(size_t i = 0; i < major.size(); i++){
+		if(!isdigit(major[i])) { break; }
+		untilNotDigit += major[i];
+	}
+	std::istringstream issUntilNotDigit(untilNotDigit);
+    int numberUntilNotDigit;
+	if (!(issUntilNotDigit >> numberUntilNotDigit) || !issUntilNotDigit.eof()) {
+		return 400;
+	}
+	if (numberUntilNotDigit >= 2) { return 505; }
+	return 0;
+}
 // void Request::sendResponse(progressInfo *obj){
 //     if (obj->requestInfo.getMethod() == "GET")
 //     {
@@ -405,43 +541,55 @@ string Request::selectBestMatchLocation(map<string, Location*> &locations)
     string bestMatch = "";
     for (map<string, Location*>::const_iterator it = locations.begin(); it != locations.end(); ++it)
     {
-        if (it->second->locationSetting.find("locationPath") != it->second->locationSetting.end())
-        {
-            const string &locationPath = it->second->locationSetting["locationPath"];
+        // if (it->second->path != "")
+        // {
+            const string &locationPath = it->second->path;
             if (requestTarget.substr(0, locationPath.size()) == locationPath)
             {
                 if (locationPath.size() > bestMatch.size())
                     bestMatch = locationPath;
             }
-        }
+        // }
     }
     return (bestMatch);
 }
 
 
 void Request::setCorrespondServer(){
-    server = config->getServer(getHostName());
-    if(server && server->getListenPort() != getPort())
-        server = NULL;
-    if(!server){
-        //port一致サーバの列挙
-        serversMap servers;
-        config->getSamePortListenServers(getPort(), servers);
-        //default_server確認
-        for(serversMap::iterator it = servers.begin();it != servers.end();it++){
-            if(it->second->isDefault){
-                server = it->second;
-                return ;
-            }
-        }
-        //default_serverがなければindexが若いもの
-        for(serversMap::iterator it = servers.begin();it != servers.end();it++){
-            if(it->second->index == 0){
-                server = it->second;
-                return ;
-            }
-        }
-    }
+    serversMap listenPortServers = config->getServerByPort(getPort());
+	for(serversMap::iterator it = listenPortServers.begin();it != listenPortServers.end();it++){
+		if(it->second->getServerName() == getHostName()){
+			server = it->second;
+			return ;
+		}
+	}
+	if (listenPortServers.size() >= 1) {
+		server = listenPortServers.begin()->second;
+		return;
+	}
+	server = config->getDefaultServer();
+	return ;
+   // if(server && server->getListenPort() != getPort())
+   //     server = config->getServer("");
+   // if(!server){
+   //     //port一致サーバの列挙
+   //     serversMap servers;
+   //     config->getSamePortListenServers(getPort(), servers);
+   //     //default_server確認
+   //     for(serversMap::iterator it = servers.begin();it != servers.end();it++){
+   //         if(it->second->isDefault){
+   //             server = it->second;
+   //             return ;
+   //         }
+   //     }
+   //     //default_serverがなければindexが若いもの
+   //     for(serversMap::iterator it = servers.begin();it != servers.end();it++){
+   //         if(it->second->index == 0){
+   //             server = it->second;
+   //             return ;
+   //         }
+   //     }
+   // }
 }
 
 void Request::setCorrespondLocation(){
@@ -482,6 +630,9 @@ string Request::getPath (){
     */
     return pathFromConfRoot;
 }
+string Request::getQueryString() {
+    return queryString;
+}
 string Request::getVersion(){
     return version;
 }
@@ -494,28 +645,29 @@ Location *Request::getLocation(){
 }
 
 string Request::getHostName(){
-    string directive = getField("host");
-    if(directive != ""){
-        strVec spDirective = split(directive, ':');
-        if(directive[directive.length()-1] == '\r')
-            directive = directive.substr(0, directive.length() -1);
-        return spDirective.size() != 2 ? directive : spDirective[0];
-    }
-    return "";
+    string hostField = getField("host"); //事前に""になるケースは弾いている
+	//前処理
+    if(hostField[hostField.length()-1] == '\r')
+        hostField = hostField.substr(0, hostField.length() -1);
+	//抽出
+    strVec spHostField = split(hostField, ':');
+	if (spHostField.size() == 1 || spHostField.size() == 2){
+		return spHostField[0];
+	}
+	return "";
 }
 
 string Request::getPort(){
-    string directive = getField("host");
-    if(directive != ""){
-        strVec spDirective = split(directive, ':');
-        if(spDirective.size() == 2){
-            if(spDirective[1][spDirective[1].size()-1] == '\r'){
-                return spDirective[1].substr(0, spDirective[1].size()-1);;
-            }
-        }else //Host = localhostの時
-            return "80";
-    }
-    return "";
+    string hostField = getField("host"); //事前に""になるケースは弾いている
+	//前処理
+    if(hostField[hostField.length()-1] == '\r')
+        hostField = hostField.substr(0, hostField.length() -1);
+	//抽出
+    strVec spHostField = split(hostField, ':');
+    if(spHostField.size() == 2){
+		return spHostField[1]; //NOTICE: 数値チェック必要? このままだと文字が入りうる
+    }else //portが指定されていない場合はhttpなので80
+        return "80";
 }
 
 string Request::getSessionId(string cookieInfo){
@@ -573,8 +725,12 @@ bool Request::getIsCgi(){
     return isCgi;
 }
 bool Request::isAllowMethod(){
-    if(location->locationSetting["allow_method"] == "none")
-        return true;
+    if(location->locationSetting["allow_method"] == "none") {
+		// 設定がないならGET, POST, DELETEのみ許可
+		if (method == "GET" || method == "POST" || method == "DELETE")
+			return true;
+        return false;
+	}
     std::vector<std::string>status = split(location->locationSetting["allow_method"], ' ');
     for (std::vector<std::string>::iterator it = status.begin(); it != status.end(); ++it)
     {

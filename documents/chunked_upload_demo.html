@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Chunked Upload Demo (CGI)</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chunked Upload デモ (CGI)</h1>
+    <div class="upload-area">
+        <input type="file" id="fileInput">
+        <p>またはファイルをドラッグ&ドロップしてください</p>
+    </div>
+    <div id="progress">
+        <div>進捗状況: <span id="progressText">0%</span></div>
+        <div>送信済みチャンク: <span id="chunksSent">0</span></div>
+    </div>
+    <div id="status"></div>
+
+    <script>
+        const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
+        const fileInput = document.getElementById('fileInput');
+        const status = document.getElementById('status');
+        const progressText = document.getElementById('progressText');
+        const chunksSent = document.getElementById('chunksSent');
+
+        async function uploadFile(file) {
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+            let chunksUploaded = 0;
+
+            try {
+                for (let start = 0; start < file.size; start += CHUNK_SIZE) {
+                    const chunk = file.slice(start, start + CHUNK_SIZE);
+                    const formData = new FormData();
+                    formData.append('chunk', chunk);
+                    formData.append('chunkIndex', chunksUploaded);
+                    formData.append('totalChunks', totalChunks);
+                    formData.append('fileName', file.name);
+
+                    const response = await fetch('/cgi_bin/chunked_upload.py', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    if (!result.success) {
+                        throw new Error(result.message);
+                    }
+
+                    chunksUploaded++;
+                    const progress = Math.round((chunksUploaded / totalChunks) * 100);
+                    progressText.textContent = `${progress}%`;
+                    chunksSent.textContent = chunksUploaded;
+
+                    // 全チャンクのアップロードが完了した場合
+                    if (result.message === "Upload completed") {
+                        status.className = 'success';
+                        status.textContent = `アップロード完了: ${result.filename}`;
+                    }
+                }
+            } catch (error) {
+                status.className = 'error';
+                status.textContent = `エラー: ${error.message}`;
+            }
+        }
+
+        // ファイル選択イベント
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                status.textContent = 'アップロード開始...';
+                uploadFile(file);
+            }
+        });
+
+        // ドラッグ&ドロップ処理
+        const dropArea = document.querySelector('.upload-area');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        dropArea.addEventListener('drop', (e) => {
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                status.textContent = 'アップロード開始...';
+                uploadFile(file);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -17,7 +17,6 @@ using namespace std;
 
 class Request: public HttpMessageParser{
     public:
-    public:
         HttpMessageParser::DetailStatus::StartLineReadStatus createInitialStatus();
         Request(Config *config);
         virtual ~Request();
@@ -30,6 +29,7 @@ class Request: public HttpMessageParser{
 
         string getMethod();
         string getPath();
+        string getQueryString();
         string getRequestTarget();
         string getVersion();
         string getHostName();
@@ -44,7 +44,7 @@ class Request: public HttpMessageParser{
     private: 
         void setConfigInfo();
         StatusCode_t validateRequestTarget();
-
+		StatusCode_t validateHttpVersion();
 
         void setCorrespondServer();
         void setCorrespondLocation();
@@ -62,12 +62,15 @@ class Request: public HttpMessageParser{
     private:
         // Request-specific elements
         Config *config;
+		size_t startLineLength;
         string method;
         string requestTarget;
         string version;
         string pathFromConfRoot;
+        string queryString;
 
         bool isCgi;
+        bool isQueryString;
         bool isAutoindex;
         // unsigned long long bodySize;
         

@@ -93,13 +93,13 @@ std::string Response::createAutoindexPage(Request& requestInfo){
     std::string content;
     content = "<html>\n";
     content += "<head>\n";
-    content += "<title>Index of " + requestInfo.getPath() + "</title>\n";
+    content += "<title>Index of " + requestInfo.getRequestTarget() + "</title>\n";
     if(requestInfo.getPath() == UPLOAD){
         content += "<script>function deleteFile(fileName) {if(confirm(fileName + ' delete OK?')) {fetch(fileName, {method: 'DELETE',}).then(response => {if (response.ok) {alert('deleted'); location.reload();} else {alert('failed delete file'); } }) .catch(error => { console.error('Error:', error); alert('error');});}}</script>";
     }
     content += "</head>\n";
     content += "<body>\n";
-    content += "<h1>Index of " + requestInfo.getPath() + "</h1>\n";
+    content += "<h1>Index of " + requestInfo.getRequestTarget()  + "</h1>\n";
     content += "<hr><table>\n";
     content += "<tr>\n";
     content += "<td align=\"left\" width=\"150\">index_list</td>\n";

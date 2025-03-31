@@ -1,6 +1,7 @@
 #ifndef RESPONSE_HPP
 # define RESPONSE_HPP
 
+#include <fcntl.h>
 #include <fstream>
 #include <set>
 #include "../HttpMessageParser.hpp"
@@ -18,8 +19,12 @@ typedef struct progressInfo progressInfo;
 #define CGI 1
 
 
+
 class Response: public HttpMessageParser{
-    public:
+    /*
+        responseのparseが必要になるのはCGI Responseを読み込む時のみ
+    */
+    public:         
         HttpMessageParser::DetailStatus::StartLineReadStatus createInitialStatus();
         Response();
         virtual ~Response();
@@ -33,18 +38,30 @@ class Response: public HttpMessageParser{
         pid_t getPidfd();
         pid_t getPipefd(int RorW);
 
+        std::vector<HttpMessageParser::ReadingStatus> getCgiResponseComponents(std::string cgiResponse) ;
         void clean();
         
     private:
         StatusCode_t statusCode;
+
         std::string response;
+        std::string httpVersion;
 
         int pipe_c2p[2];
+        int pipe_p2c[2];
         int pidfd;
 
         bool isReturn;
-        //cgiレスポンス受け取り用 (headersとbodyはHttpMessageParserで定義されている)
+
+        size_t numEnvironLine;
+
+        /*
+        cgiレスポンス受け取り用
+        */
+        bool checkCgiResponseSyntax(std::string cgiResponse);
+        // headersとbodyはHttpMessageParserで定義されている
         virtual void parseStartLine(char c);
+
         virtual void checkIsWatingLF(char c, bool isExistThirdElement);
         std::string statusPhrase;
 
@@ -53,7 +70,8 @@ class Response: public HttpMessageParser{
         std::string getHeader(std::string fieldName, std::string::size_type content_length, Request requestInfo);
 
         ResponseType_t createResponseByCgi(progressInfo *obj);
-        void executeCgi(Request& requestInfo);
+        void executeCgi(progressInfo *obj);
+        void createEnviron(progressInfo *obj, char **environ);
 
         //utils
         std::string getGmtDate();

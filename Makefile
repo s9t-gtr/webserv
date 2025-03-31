@@ -5,14 +5,14 @@ CPPS =  config/utils.cpp \
 		HttpMessage/Request/Request.cpp \
 		HttpMessage/Response/Response.cpp \
 		HttpMessage/Response/autoindex.cpp \
+		HttpMessage/Response/MetaVariables.cpp \
 		HttpConnection/HttpConnection.cpp \
 		HttpConnection/http_utils.cpp \
-		HttpConnection/post_delete_utils.cpp \
 		main.cpp
 
-CGIS = cgi/test.cpp cgi/time.cpp cgi/loop.cpp 
+CGIS = cgi_bin/test.cpp cgi_bin/time.cpp cgi_bin/loop.cpp 
 
-CGIS_POST = cgi_post/upload.cpp cgi_post/upload2.cpp 
+CGIS_POST = cgi_bin/upload.cpp cgi_bin/upload2.cpp 
 
 COOKIE_DIR = Cookie
 COOKIE = Cookie/userinfo.txt
@@ -20,13 +20,13 @@ COOKIE = Cookie/userinfo.txt
 OBJS = $(CPPS:.cpp=.o)
 
 NAME = webserv
-CGI_TARGETS := $(patsubst cgi/%.cpp,cgi/%.cgi,$(CGIS))
-CGI_POST_TARGETS := $(patsubst cgi_post/%.cpp,cgi_post/%.cgi,$(CGIS_POST))
+CGI_TARGETS := $(patsubst cgi_bin/%.cpp,cgi_bin/%.cgi,$(CGIS))
+CGI_POST_TARGETS := $(patsubst cgi_bin/%.cpp,cgi_bin/%.cgi,$(CGIS_POST))
 
-cgi/%.cgi: cgi/%.cpp
+cgi/%.cgi: cgi_bin/%.cpp
 	$(CXX) $(CXXFLAGS) $< -o $@
-cgi_post/%.cgi: cgi_post/%.cpp
-	$(CXX) $(CXXFLAGS) cgi_post/utils/login.cpp $< -o $@
+cgi_post/%.cgi: cgi_bin/%.cpp
+	$(CXX) $(CXXFLAGS) cgi_bin/utils/login.cpp $< -o $@
 
 CXX = c++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++98

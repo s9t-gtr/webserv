@@ -11,6 +11,7 @@
 #include <sys/wait.h>
 #include <sstream>
 #include <sys/event.h>
+#include <netinet/in.h> 
 
 
 class HttpConnection;
@@ -33,7 +34,9 @@ typedef struct progressInfo{
     bool cgiTimer;
     int sndbuf;
     int sendKind;
+    std::string clientIpAddress; 
     std::string requestPath;
+    char **holdMetaVariableEnviron;
     progressInfo(Config *config): requestInfo(config){}
 } progressInfo;
 
@@ -111,7 +114,7 @@ class HttpConnection{
         // bool bodyConfirm(progressInfo info);
         // bool checkCompleteRecieved(progressInfo info);
 
-        void initProgressInfo(progressInfo *obj, SOCKET socket, int sndbuf);
+        void initProgressInfo(progressInfo *obj, SOCKET socket, int sndbuf, std::string clientIpAddress);
         static void recvHandler(progressInfo *obj);
         // static void recvEofTimerHandler(progressInfo *obj);
         static void timeoutHandler(progressInfo *obj);

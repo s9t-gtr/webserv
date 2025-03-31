@@ -11,6 +11,12 @@ int main(int argc, char **argv){
         std::cout << "Error: invalid execute" << std::endl;
         return 1;
     }
+	// webservディレクトリ以外から実行された場合のために、プログラムのカレントディレクトリを固定する
+	//  stat()でファイルの存在確認を行う際、カレントディレクトリから参照するため、固定しておけばtesterなどから実行してもwebserv/以下のファイルを参照できる
+	if (chdir("/Users/s9t/Developer/42cursus/webserv/") != 0) {
+        perror("chdir failed");
+        return 1;
+    }
     try{
         Config *conf = Config::getInstance(argv[1]);
         std::set<int> tcpSocketSet = conf->getTcpSockets();

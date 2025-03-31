@@ -67,6 +67,8 @@ void HttpConnection::startEventLoop(Config *conf){
             if(obj == NULL)
                 establishTcpConnection(eventlist[i].ident, conf);
             else if(eventlist[i].filter == EVFILT_READ)
+                
+                
                 obj->rHandler(obj);
             else if(eventlist[i].filter == EVFILT_WRITE)
                 obj->wHandler(obj);
@@ -77,7 +79,11 @@ void HttpConnection::startEventLoop(Config *conf){
         }
     }
 }
-
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+std::string getClientAddress(struct sockaddr_storage* client_sa);
+std::string getClientHostname(const std::string& clientIpAddress);
 void HttpConnection::establishTcpConnection(SOCKET sockfd, Config *config){
     // std::cerr << DEBUG << "TCP CONNECTION ESTABLISHED " << std::endl;
 
@@ -92,6 +98,65 @@ void HttpConnection::establishTcpConnection(SOCKET sockfd, Config *config){
     }
     // std::cerr << DEBUG << "[sokcet:" << sockfd << "] create new socket: " << newSocket << std::endl;
     
+    //meta variable "REMOTE_ADDR"
+    std::string clientIpAddress = getClientAddress(&client_sa);
+    std::string clientHostname = getClientHostname( clientIpAddress);
+    std::cout << "Client Hostname: " << clientHostname << std::endl;
+
+    // struct addrinfo hints, *res;
+    // memset(&hints, 0, sizeof(hints));
+    // hints.ai_family = AF_INET;
+    // hints.ai_flags = AI_CANONNAME;
+    // getaddrinfo("dns.google", NULL, &hints, &res);
+
+    // if (getaddrinfo("8.8.8.8", NULL, &hints, &res) == 0) {
+    //     printf("ai_canonname: %s\n", res->ai_canonname);
+    // } else {
+    //     printf("Failed to resolve\n");
+    // }
+
+    std::string hostname = "127.0.0.1";
+    struct addrinfo hints, *res;
+    struct in_addr addr;
+    int err;
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_family = AF_INET;
+    hints.ai_flags = AI_NUMERICHOST | AI_CANONNAME;
+    if ((err = getaddrinfo(hostname.c_str(), NULL, &hints, &res)) != 0) {
+        printf("error %d\n", err);
+    }
+
+    addr.s_addr= ((struct sockaddr_in *)(res->ai_addr))->sin_addr.s_addr;
+
+    printf("ip addres: %s\n", inet_ntoa(addr));
+    if (res->ai_canonname != NULL) {
+        std::cout << "ai_canonnname: " << res->ai_canonname << std::endl;
+    } else {
+        std::cout << "ai_canonname == NULL" << std::endl;    
+    }
+
+	// 取得した情報を解放
+    freeaddrinfo(res);
+
+
+
+
+    struct sockaddr_in sa;
+    char host[1024];
+    char service[20];
+
+    sa.sin_family = AF_INET;
+    inet_pton(AF_INET, "8.8.4.4", &sa.sin_addr);
+
+    if (getnameinfo((struct sockaddr*)&sa, sizeof(sa), host, sizeof(host), service, sizeof(service), NI_NAMEREQD) == 0) {
+        printf("Host: %s\n", host);
+    } else {
+        printf("Failed to resolve hostname\n");
+    }
+    // std::cout << "google Client Hostname: " << googlehostname << std::endl;
+    //
     int sndbuf = 1;
     len = sizeof(sndbuf);
     getsockopt(newSocket, SOL_SOCKET, SO_SNDBUF, &sndbuf, &len);
@@ -104,11 +169,57 @@ void HttpConnection::establishTcpConnection(SOCKET sockfd, Config *config){
 
     progressInfo *obj = new progressInfo(config);
     // std::memset(obj, 0, sizeof(progressInfo));
-    initProgressInfo(obj, newSocket, sndbuf);
+    initProgressInfo(obj, newSocket, sndbuf, clientIpAddress);
     createNewEvent(newSocket, EVFILT_READ, EV_ADD, 0, 0, obj);
 }
 
-void HttpConnection::initProgressInfo(progressInfo *obj, SOCKET socket, int sndbuf){
+std::string getClientAddress(struct sockaddr_storage* client_sa) {
+    // if (client_sa->ss_family == AF_INET) {
+    // IPv4 の場合
+    struct sockaddr_in* client_in = (struct sockaddr_in*)client_sa;
+    uint32_t ip_addr = ntohl(client_in->sin_addr.s_addr);
+    uint8_t octet1 = (ip_addr >> 24) & 0xFF;
+    uint8_t octet2 = (ip_addr >> 16) & 0xFF;
+    uint8_t octet3 = (ip_addr >> 8) & 0xFF;
+    uint8_t octet4 = ip_addr & 0xFF;
+    std::ostringstream oss;
+    oss << (int)octet1 << "." 
+        << (int)octet2 << "."
+        << (int)octet3 << "."
+        << (int)octet4;
+    // 結果を文字列として取得
+    std::string clientIpAddress = oss.str();
+    std::cout << "Client IPv4: " << clientIpAddress << std::endl;
+    return clientIpAddress;
+}
+std::string getClientHostname(const std::string& clientIpAddress) {
+    struct addrinfo hints, *result;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;      // IPv4とIPv6の両方をサポート
+    hints.ai_socktype = SOCK_STREAM; // TCPソケット
+    hints.ai_flags = AI_CANONNAME | AI_NUMERICHOST;   // 正式なホスト名を取得
+
+    // 名前解決を実行
+    int status = getaddrinfo(clientIpAddress.c_str(), NULL, &hints, &result);
+    if (status != 0) {
+        std::cerr << "Error: getaddrinfo failed: " << gai_strerror(status) << std::endl;
+        return clientIpAddress; // 名前解決が失敗した場合はIPをそのまま返す
+    }
+
+    std::string hostname;
+    if (result != NULL && result->ai_canonname != NULL) {
+        hostname = result->ai_canonname;
+    } else {
+        std::cerr << "Warning: ai_canonname is NULL for IP: " << clientIpAddress << std::endl;
+        hostname = clientIpAddress; // ホスト名が取得できない場合はIPアドレスを返す
+    }
+
+    freeaddrinfo(result); // メモリを解放
+
+    return hostname;
+}
+
+void HttpConnection::initProgressInfo(progressInfo *obj, SOCKET socket, int sndbuf, std::string clientIpAddress){
     obj->kq = kq;
     obj->buffer = "";
     obj->content_length = 0;
@@ -125,6 +236,7 @@ void HttpConnection::initProgressInfo(progressInfo *obj, SOCKET socket, int sndb
     obj->sndbuf = sndbuf;
     obj->sendKind = -1;
     obj->requestPath = "";
+    obj->clientIpAddress = clientIpAddress;
 }
 
 
@@ -139,12 +251,14 @@ void HttpConnection::recvHandler(progressInfo *obj){
         if(obj->wHandler == NULL)
             obj->requestInfo.readBufferAndParse(buf, bytesReceived);
         if(obj->requestInfo.getReadingStatus() == Request::Complete){
+			std::cout << "status: complete" << std::endl;
             
             createNewEvent(obj->socket, EVFILT_READ, EV_DELETE, 0, 0, NULL); //リクエストが完結したらREADは不要になる
             obj->rHandler = NULL;
 
             int responseType = obj->responseInfo.createResponse(obj);
             if(responseType == STATIC_PAGE){
+				std::cout << "status: static page" << std::endl;
 
                 createNewEvent(obj->socket, EVFILT_WRITE, EV_ADD, 0, 0, obj);
                 obj->wHandler = sendToClient;
@@ -163,7 +277,8 @@ void HttpConnection::recvHandler(progressInfo *obj){
             setTimer(obj, REQUEST_EOF_DETECTION);
         }
     }else if(bytesReceived == 0){
-        // std::cerr << "close: socket: " << obj->socket << std::endl;
+		std::cout << "status: byteRecieved == 0" << std::endl;
+        //Case of client close connection 
         close(obj->socket);
         // std::memset(obj, 0, sizeof(progressInfo));
         delete obj;
@@ -188,9 +303,6 @@ void HttpConnection::largeResponseHandler(progressInfo *obj){
 }
 
 
-
-
-
 void HttpConnection::cgiExitHandler(progressInfo *obj){
     // triggered by oneshot process event
     deleteTimer(obj);
@@ -201,11 +313,7 @@ void HttpConnection::cgiExitHandler(progressInfo *obj){
     if (WEXITSTATUS(status) == 0){ //cgi実行プロセスの正常終了
         obj->wHandler = readCgiHandler;
     } else {
-        char buf[1024];
-        ssize_t bytesReceived = read(obj->responseInfo.getPipefd(R), &buf, 1024);
-        if(0 < bytesReceived)
-            std::cout << std::string(buf, buf+bytesReceived) << std::endl;
-        obj->responseInfo.createResponseFromStatusCode(500, obj->requestInfo);
+        obj->responseInfo.createResponseFromStatusCode(502, obj->requestInfo);
         obj->wHandler = sendToClient;
 
         close(obj->responseInfo.getPipefd(R));
@@ -219,16 +327,56 @@ void HttpConnection::readCgiHandler(progressInfo *obj){
     char buf[MAX_BUF_LENGTH];
 
     ssize_t bytesReceived = read(obj->responseInfo.getPipefd(R), &buf, MAX_BUF_LENGTH);
+    std::cout << "read: " << bytesReceived << std::endl;
     if(0 < bytesReceived){
         obj->buffer += std::string(buf, buf+bytesReceived);
-        obj->responseInfo.readBufferAndParse(buf, bytesReceived);
-        // std::cerr << DEBUG << "bytesReceived: " << bytesReceived << std::endl;
-        if(obj->responseInfo.getReadingStatus() != Response::Complete){
-            // obj->wHandler = sendCgiHandler;
-            obj->wHandler = sendToClient;
-            close(obj->responseInfo.getPipefd(R));
-        }
-    }else{
+    }else if (bytesReceived == 0) {
+        //case of detect to response termination 
+        /*
+            CGI Responseとしての要件
+                - header fieldが1行以上含まれる、もしくはstatus lineが存在する
+            以上の要件を満たさない場合は502 Bad Gatewayを返す。
+            しかし、CGI Responseの要件を満たし、HTTP Responseの要件を満たしていない場合、serverでHTTP Response要件を満たすように形を整える必要がある
+                - CGIでheadersとbodyのみ作成した場合はserver側でstatus lineを追加しなければならない -> nginxはそうなっている
+                - Content-Length headerをCGIで追加しなかった場合(例えばContent-Typeのみ持たせた場合など)、serverでContent-Lengthを追加しなければならない
+        */
+
+        // if (CGI_RESPONSE要件を満たしていない) {
+        //     response = 502 Bad Gatewayのresponse
+        //     obj->wHandler = sendToClient;
+        //     close(obj->responseInfo.getPipefd(R));
+        //     return 
+        // }
+        
+        // parseしてresponseを作成()
+
+        //CgiResponseはstatusLineがない可能性があるためparse前に構成要素を確認
+        // std::vector<HttpMessageComponent> components = obj->responseInfo.getCgiResponseComponents();
+        // if (std::find(components.begin(), components.end(), headers) == components.end()) {
+        //     
+        // } 
+        // 
+        // if (obj->responseInfo.checkCgiResponseSyntax(obj->buffer)) {
+        //     obj->responseInfo.createResponseFromStatusCode(502, obj->requestInfo);
+        //     obj->wHandler = sendToClient;
+        //     close(obj->responseInfo.getPipefd(R));
+        //     return ;
+        // }
+
+        //CGIが生成するresponseにはStartLineは存在しないため事前にParseの際のReadingStatusをHeadersにしておく
+        // if(obj->responseInfo.getReadingStatus() == Response::StartLine) {
+        //     obj->responseInfo.setReadingStatus(Response::Headers);
+        // }
+        // obj->responseInfo.readBufferAndParse(buf, bytesReceived);
+        // if(obj->responseInfo.getReadingStatus() != Response::Complete){
+
+		obj->responseInfo.setResponse(obj->buffer);
+        obj->wHandler = sendToClient;
+        // obj->rHandler = NULL;
+        close(obj->responseInfo.getPipefd(R));
+        // }
+    } else {
+        //case of read() error
         // obj->sendKind = NORMAL;
         // obj->httpConnection->sendInternalErrorPage(obj);
         obj->wHandler = sendToClient;
@@ -299,9 +447,6 @@ void HttpConnection::sendToClient(progressInfo *obj){
             bad_request: 2 - objをdeleteしつつsocketもcloseするので分岐が必要
     
     */
-    // std::cerr << DEBUG << "sendtoClient()" << std::endl;
-    // std::cerr << DEBUG << GRAY << "======================= response =======================" << std::endl;
-    // std::cerr << DEBUG << obj->buffer << RESET << std::endl;
     bool isLargeResponse = true;
     std::string response = obj->responseInfo.getResponse();
     if((size_t)obj->sndbuf < response.length()){
@@ -310,8 +455,11 @@ void HttpConnection::sendToClient(progressInfo *obj){
         obj->wHandler = largeResponseHandler;
     }else
         isLargeResponse = false;
+    // std::cerr << DEBUG << "sendtoClient()" << std::endl;
     std::cout << "send() use socket : " << obj->socket << std::endl;
-    std::cout << "response: " << response << std::endl;
+    // std::cerr << DEBUG << GRAY << "======================= response =======================" << std::endl;
+    // std::cerr << DEBUG << response << RESET << std::endl;
+
     int status = send(obj->socket, response.c_str(), response.length(), 0);
     if (status <= 0){
         // std::cerr << DEBUG << "---- send(): error ----: " << obj->socket << std::endl;
@@ -338,7 +486,7 @@ void HttpConnection::sendToClient(progressInfo *obj){
         //次のリクエストに備える(bodyの不要なリクエスト(GET methodを持つなど)にbodyが入っていた場合、次のreadの先頭に来るのを実装するか否か迷い中)
         createNewEvent(obj->socket, EVFILT_READ, EV_ADD, 0, 0, obj);
         createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
-        obj->httpConnection->initProgressInfo(obj, obj->socket, obj->sndbuf);
+        obj->httpConnection->initProgressInfo(obj, obj->socket, obj->sndbuf, obj->clientIpAddress);
         obj->requestInfo.clean();
         obj->responseInfo.clean();
     }   
