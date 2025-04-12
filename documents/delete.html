@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DELETEリクエスト送信例</title>
+</head>
+<body>
+    <h1>DELETEリクエスト送信例</h1>
+    <input type="text" id="fileName" placeholder="削除するファイル名">
+    <button onclick="sendDeleteRequest()">削除</button>
+
+    <script>
+        function sendDeleteRequest() {
+            const fileName = document.getElementById('fileName').value;
+            if (!fileName) {
+                alert('ファイル名を入力してください。');
+                return;
+            }
+            fetch(`upload/${encodeURIComponent(fileName)}`, {
+                method: 'DELETE',
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                if (response.status >= 200 && response.status < 300) {
+                    console.log('Success: File deleted');
+                    alert('ファイルが正常に削除されました。');
+                } else {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                alert(`エラーが発生しました: ${error.message}`);
+            });
+        }
+    </script>
+</body>
+</html>
