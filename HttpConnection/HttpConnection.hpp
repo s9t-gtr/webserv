@@ -2,8 +2,8 @@
 # define __HTTPCONNECTION_HPP_
 
 #include "../config/Config.hpp"
-#include "../HttpMessage/Request/Request.hpp"
-#include "../HttpMessage/Response/Response.hpp"
+#include "../request/RequestParse.hpp"
+#include <dirent.h>
 #include <sstream>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -11,33 +11,26 @@
 #include <sys/wait.h>
 #include <sstream>
 #include <sys/event.h>
-#include <netinet/in.h> 
-
-
 class HttpConnection;
-
 typedef struct progressInfo{
     HttpConnection* httpConnection;
-    Request requestInfo;
-    Response responseInfo;
     int kq;
     void (*rHandler)(progressInfo *obj);
-    void (*wHandler)(progressInfo *obj);
-    void (*timerHandler)(progressInfo *obj);
-    void (*processHandler)(progressInfo *obj);
+    void (*wHandler)(progressInfo *obj, Config *conf);
+    void (*tHandler)(progressInfo *obj);
+    void (*pHandler)(progressInfo *obj);
+    bool readCgiInitial;
     std::string buffer;
     std::string::size_type content_length;
+    int pipe_c2p[2];
     SOCKET socket;
     int exit_status;
     pid_t childPid;
-    bool messageTimer; //true: on
-    bool cgiTimer;
+    bool eofTimer; //true: on
     int sndbuf;
-    int sendKind;
-    std::string clientIpAddress; 
+    int tmpKind;
     std::string requestPath;
-    char **holdMetaVariableEnviron;
-    progressInfo(Config *config): requestInfo(config){}
+
 } progressInfo;
 
 typedef struct timespec timespec;
@@ -58,86 +51,79 @@ typedef std::map<int, struct kevent*> keventMap;
 #define SEND 5
 #define CLOSE 6
 
-#define REQUEST_EOF_DETECTION 1
-#define CGI_TIMEOUT_DETECTION 2
-
 class HttpConnection{
     private:
         static int kq;
-        static struct kevent eventlist[1000];
+        static struct kevent *eventlist;
         static timespec timeSpec;
     private:
         HttpConnection();
+        HttpConnection(socketSet tcpSockets);
         HttpConnection(const HttpConnection& other);
         HttpConnection& operator=(const HttpConnection& other);
-    public:
-        HttpConnection(socketSet tcpSockets);
         ~HttpConnection();
-        // static HttpConnection* getInstance(socketSet tpcSockets);
-        // static void destroy(HttpConnection *inst);
+    public:
+        static HttpConnection* getInstance(socketSet tpcSockets);
+        static void destroy(HttpConnection *inst);
         void startEventLoop(Config *conf);
     private:
-        void connectionPrepare(socketSet tcpSockets);
-        void createKqueue();
-        void createEventOfEstablishTcpConnection(socketSet tcpSockets);
+        static void connectionPrepare(socketSet tcpSockets);
+        static void createKqueue();
+        static void createEventOfEstablishTcpConnection(socketSet tcpSockets);
         static void createNewEvent(SOCKET targetSocket, short filter, u_short flags, u_int fflags, intptr_t data, void *obj);
         static void eventRegister(struct kevent *changelist);
-
         void eventExecute(Config *conf, SOCKET sockefd, socketSet tcpSockets);
-        void establishTcpConnection(SOCKET sockfd, Config *config);
-        void sendResponse(progressInfo *obj);
-        // void executeCgi(Request& requestInfo, int *pipe_c2p);
+        void establishTcpConnection(SOCKET sockfd);
+        void sendResponse(RequestParse& requestInfo, progressInfo *obj);
+        void executeCgi(RequestParse& requestInfo, int *pipe_c2p);
 
-        static void sendToClient(progressInfo *obj);
-        // std::string getStringFromHtml(std::string wantHtmlPath);
-        // void sendDefaultErrorPage(VirtualServer* server, progressInfo *obj);
-        // void sendAutoindexPage(Request& requestInfo, progressInfo *obj);
-        // std::string createAutoindexPage(Request& requestInfo, std::string path);
-        // static std::string getGmtDate();
-        // void sendStaticPage(progressInfo *obj);
-        // void createResponse(std::string statusLine, std::string content);
-        // void sendRedirectPage(Location* location, progressInfo *obj);
-        void postProcess(Request& requestInfo, progressInfo *obj);
-        // void executeCgi_postVersion(Request& requestInfo, int pipe_c2p[2]);
-        // void sendForbiddenPage(progressInfo *obj);
-        void deleteProcess(progressInfo *obj);
-        // static void sendNotImplementedPage(progressInfo *obj);
-        // static void sendNotAllowedPage(progressInfo *obj);
-        // static void requestEntityPage(progressInfo *obj);
+        void sendToClient(std::string response, progressInfo *obj, int kind);
+        static std::string getStringFromHtml(std::string wantHtmlPath);
+        void sendDefaultErrorPage(VirtualServer* server, progressInfo *obj);
+        void sendAutoindexPage(RequestParse& requestInfo, progressInfo *obj);
+        std::string createAutoindexPage(RequestParse& requestInfo, std::string path);
+        std::string getGmtDate();
+        void sendStaticPage(RequestParse& requestInfo, progressInfo *obj);
+        void createResponse(std::string statusLine, std::string content);
+        void sendRedirectPage(Location* location, progressInfo *obj);
+        void postProcess(RequestParse& requestInfo, progressInfo *obj);
+        void executeCgi_postVersion(RequestParse& requestInfo, int pipe_c2p[2]);
+        void sendForbiddenPage(progressInfo *obj);
+        void deleteProcess(RequestParse& requestInfo, progressInfo *obj);
+        void sendNotImplementedPage(progressInfo *obj);
+        void sendNotAllowedPage(progressInfo *obj);
+        void requestEntityPage(progressInfo *obj);
 
 
-        // bool isAllowedMethod(Location* location, std::string method);
-        // static void sendInternalErrorPage(progressInfo *obj);
-        // static void sendBadRequestPage(progressInfo *obj);
-        // static void sendFoundPage(progressInfo *obj);
-        // bool isReadNewLine(std::string buffer);
-        // bool bodyConfirm(progressInfo info);
-        // bool checkCompleteRecieved(progressInfo info);
+        bool isAllowedMethod(Location* location, std::string method);
+        void sendInternalErrorPage(progressInfo *obj, int kind);
+        void sendBadRequestPage(progressInfo *obj);
 
-        void initProgressInfo(progressInfo *obj, SOCKET socket, int sndbuf, std::string clientIpAddress);
+        bool isReadNewLine(std::string buffer);
+        bool bodyConfirm(progressInfo info);
+        bool checkCompleteRecieved(progressInfo info);
+
+        void initProgressInfo(progressInfo *obj, SOCKET socket, int sndbuf);
         static void recvHandler(progressInfo *obj);
-        // static void recvEofTimerHandler(progressInfo *obj);
-        static void timeoutHandler(progressInfo *obj);
-        // static void sendHandler(progressInfo *obj);
-        static void cgiExitHandler(progressInfo *obj);
-        static void readCgiHandler(progressInfo *obj);
-        // static void sendCgiHandler(progressInfo *obj);
-        // static void sendTimeoutPage(progressInfo *obj);
-        static void largeResponseHandler(progressInfo *obj);
-        // static void confirmExitStatusFromCgi(progressInfo *obj);
+        static void recvEofTimerHandler(progressInfo *obj);
+
+        static void sendHandler(progressInfo *obj, Config *conf);
+        static void readCgiHandler(progressInfo *obj, Config *conf);
+        static void sendCgiHandler(progressInfo *obj, Config *conf);
+        static void sendTimeoutPage(progressInfo *obj);
+        static void sendLargeResponse(progressInfo *obj, Config *conf);
+        static void confirmExitStatusFromCgi(progressInfo *obj);
 
         //cookie/sessions
-        // void cookiePage(Request& requestInfo, progressInfo *obj);
-        // static std::string createRedirectPath(std::string requestPath);
-        // void sendLoginPage(int status, Request& requestInfo, progressInfo *obj);
-        // void sendUserPage(std::vector<std::string> userInfo, int status, Request& requestInfo, progressInfo *obj);
-        // static void deleteCgiHeader(std::string &responseHeaders);
-        // static std::string addAnnotationToLoginPage(std::string annotation);
+        void cookiePage(RequestParse& requestInfo, progressInfo *obj);
+        static std::string createRedirectPath(std::string requestPath);
+
+        void sendLoginPage(int status, RequestParse& requestInfo, progressInfo *obj);
+        void sendUserPage(std::vector<std::string> userInfo, int status, RequestParse& requestInfo, progressInfo *obj);
+        static void deleteCgiHeader(std::string &responseHeaders);
+        static std::string addAnnotationToLoginPage(std::string annotation);
 
 
-        //timer 
-        static void setTimer(progressInfo *obj, int type);
-        static void deleteTimer(progressInfo *obj);
 };
 
 #endif

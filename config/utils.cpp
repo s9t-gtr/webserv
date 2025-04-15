@@ -24,7 +24,7 @@ size_t prefixSpaceCount(std::string line){
 }
 void cutPrefixSpace(std::string& line){
     size_t i = 0;
-    while(std::isspace(line[i])){
+    while(line[i] == ' ' || line[i] == '\t'){
         i++;
     }
     line = line.substr(i);
@@ -117,11 +117,6 @@ bool isAppropriateDirectiveForBlock(std::string line, std::string usableDirectiv
 }
 
 std::vector<std::string> split(std::string str, char sep) {
-    /*
-        example:
-            str = "", sep = ' '
-                return -> "" (size=1)
-    */
    size_t first = 0;
    std::string::size_type last = str.find_first_of(sep);
    std::vector<std::string> result;

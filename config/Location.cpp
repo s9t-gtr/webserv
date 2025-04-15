@@ -34,10 +34,10 @@ void Location::setSetting(std::string directiveName, std::string directiveConten
         throw std::runtime_error(directiveName+" is duplicate");
     locationSetting[directiveName] = directiveContent;
 }
-// std::string Location::getLocationPath(){
-//     locationSetting["locationPath"] = path;//この行追加で複数location格納成功
-//     return locationSetting["locationPath"];
-// }
+std::string Location::getLocationPath(){
+    locationSetting["locationPath"] = path;//この行追加で複数location格納成功
+    return locationSetting["locationPath"];
+}
 
 void Location::confirmValuesLocation(){
     confirmIndex();
@@ -50,34 +50,24 @@ void Location::confirmValuesLocation(){
 void Location::confirmIndex()
 {
     if(locationSetting.find("index") == locationSetting.end())
-        return setSetting("index", "index.html");
-    else if (locationSetting["index"] == "\"\"") //index "";のように指定したとき 
-        locationSetting["index"] = "off";
-    else if  (locationSetting["index"] == "") 
-        locationSetting["index"] = "off";
+        setSetting("index", "none");
 }
 
 void Location::confirmRoot()
 {
-    /*
-        - request pathの先頭には'/'が入っていなければBad Requestを返すという前提がある
-        - rootが設定されていない時には"."にする
-        - "document"や".."のときはそのまま使うが、末尾に"/"がつく時には取り除く
-        - request pathと繋げたときにwebservパスからの相対パスを表現するので、rootに絶対パスを指定されても同じ連結方法でアクセスできる
-            root: "..", request path: "/cgi/"の時 .. + /cgi/ -> "../cgi/"
-            root: "/", request path: "/cgi/"の時  "" + /cgi/ -> "/cgi/"
-        - best match Locationを見つける時にはrequest path のgetRawPath()を使用する
-    */
-    if(locationSetting.find("root") == locationSetting.end()){
-        setSetting("root", ".");
-        return ;
+    if(locationSetting.find("root") == locationSetting.end())
+        setSetting("root", "");
+    size_t len = locationSetting["root"].length();
+    if(0 < len && locationSetting["root"][len-1] != '/'){
+        /*
+            "document"や".."を指定された時に末尾に/をつける。
+            - request path.substr(1)と繋げる際にwebservパスからの相対パスを表現、rootに絶対パスを指定されても同じ連結方法でアクセスできる
+                root: "..", request path: "/cgi/"の時 ../ + cgi/
+                root: "/", request path: "/cgi/"の時  / + cgi/
+            - best match Locationを見つける時にはrequest path のgetRawPath()を使用する
+        */
+        locationSetting["root"] += "/";
     }
-    std::string root = locationSetting["root"];
-    size_t len = root.length();
-    if(0 < len && root[len-1] == '/'){
-        locationSetting["root"] = root.substr(0, root.size() - 1);
-    }
-
 }
 
 void Location::confirmAllowMethod()
