@@ -66,6 +66,7 @@ void RequestParse::setMethodPathVersion(std::string& requestMessage){
         throw std::runtime_error("Error: invalid request: non space in first line"); 
     method = splitFirstRow[0];
     rawPath = splitFirstRow[1];
+    if (rawPath.find("..") != std::string::npos) throw std::runtime_error("invalid path");
     version = splitFirstRow[2];
 
 }
