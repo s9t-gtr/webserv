@@ -6,6 +6,7 @@ CPPS =  config/utils.cpp \
 		HttpConnection/autoindex.cpp \
 		HttpConnection/http_utils.cpp \
 		HttpConnection/post_delete_utils.cpp \
+		HttpConnection/MetaVariables.cpp \
 		main.cpp
 
 CGIS = cgi/test.cpp cgi/time.cpp cgi/loop.cpp 

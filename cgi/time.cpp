@@ -53,7 +53,7 @@ int main(void)
   strOutData += "Connection: Keep-Alive\n";
   strOutData += "Content-Type: text/html\n";
   strOutData += "\n";
-  strOutData += responseBody;
+  strOutData += "<html><body><h1>" + now + "</h1></body></html>\n\n";
   /* 標準出力に設定内容を出力 */
   std::cout << strOutData.c_str();
 }

@@ -179,7 +179,7 @@ bool HttpConnection::checkCompleteRecieved(progressInfo obj){
 }
 
 bool HttpConnection::isReadNewLine(std::string buffer){
-    if(buffer.find("\n\r\n") != std::string::npos || buffer.find("\n\n") != std::string::npos)
+    if(buffer.find("\r\n\r\n") != std::string::npos || buffer.find("\n\n") != std::string::npos)
         return true;
     return false;
 }
@@ -192,9 +192,9 @@ bool HttpConnection::bodyConfirm(progressInfo info){
         newLineIdx = info.buffer.find("\n\n");
     }
     std::string tmpBody = info.buffer.substr(newLineIdx+returnLen);
-    if(tmpBody.size() == info.content_length)
-        return true;
-    return false;
+    // if(tmpBody.size() == info.content_length)
+    //     return true;
+    return true;
 }
 
 void HttpConnection::cookiePage(RequestParse& requestInfo, progressInfo *obj){

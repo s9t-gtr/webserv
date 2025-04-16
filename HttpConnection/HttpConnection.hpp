@@ -3,6 +3,7 @@
 
 #include "../config/Config.hpp"
 #include "../request/RequestParse.hpp"
+#include "MetaVariables.hpp"
 #include <dirent.h>
 #include <sstream>
 #include <sys/types.h>
@@ -31,6 +32,16 @@ typedef struct progressInfo{
     std::string requestPath;
     bool isClose;
 
+    char **holdMetaVariableEnviron;
+    ~progressInfo() {
+        if (holdMetaVariableEnviron) {
+            for (int i = 0; holdMetaVariableEnviron[i]; ++i) {
+                free(holdMetaVariableEnviron[i]);  // 各要素を free
+            }
+            free(holdMetaVariableEnviron);  // 最後に env 自体を free
+        }
+    }
+
 } progressInfo;
 
 typedef struct timespec timespec;
@@ -40,7 +51,7 @@ typedef std::map<int, struct kevent*> keventMap;
 #define W 1
 #define R 0
 // #define TIMEOUT 10000
-#define MAX_BUF_LENGTH 64
+#define MAX_BUF_LENGTH 1024
 #define UPLOAD "upload/"
 
 #define NORMAL 0
@@ -73,7 +84,7 @@ class HttpConnection{
         void eventExecute(Config *conf, SOCKET sockefd, socketSet tcpSockets);
         void establishTcpConnection(SOCKET sockfd);
         void sendResponse(RequestParse& requestInfo, progressInfo *obj);
-        void executeCgi(RequestParse& requestInfo, int *pipe_c2p);
+        void executeCgi(progressInfo *obj, RequestParse &requestInfo,  int pipe_c2p[2]);
 
         static void sendToClient(std::string response, progressInfo *obj);
         static std::string getStringFromHtml(std::string wantHtmlPath);
@@ -120,6 +131,7 @@ class HttpConnection{
         void sendUserPage(std::vector<std::string> userInfo, int status, RequestParse& requestInfo, progressInfo *obj);
         static void deleteCgiHeader(std::string &responseHeaders);
         static std::string addAnnotationToLoginPage(std::string annotation);
+        void createEnviron(progressInfo *obj, RequestParse &requestInfo, char **environ);
 
 
 };

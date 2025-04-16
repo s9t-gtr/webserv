@@ -65,10 +65,10 @@ void RequestParse::setMethodPathVersion(std::string& requestMessage){
     if(splitFirstRow.size() != 3)
         throw std::runtime_error("Error: invalid request: non space in first line"); 
     method = splitFirstRow[0];
-    if(splitFirstRow[1][0] != '/' || splitFirstRow[1].find("..", 0) != std::string::npos)
-        throw std::runtime_error("Error: The path contains \"..\"");
     rawPath = splitFirstRow[1];
+    if (rawPath.find("..") != std::string::npos) throw std::runtime_error("invalid path");
     version = splitFirstRow[2];
+
 }
 
 void RequestParse::setHeadersAndBody(std::string& requestMessage){
@@ -200,7 +200,12 @@ void RequestParse::setCorrespondServer(Config *conf){
 void RequestParse::setCorrespondLocation(){
     location = getLocationSetting();
 }
-
+void RequestParse::setPathFromConfRoot(std::string newPath) {
+    pathFromConfRoot = newPath;
+}
+void RequestParse::setQueryString(std::string newQueryString){
+    queryString = newQueryString;
+}
 void RequestParse::createPathFromConfRoot(){
     /*
         「configのrootディレクティブで設定されたpath」と「request lineで指定されたpath」を連結する関数。
@@ -239,6 +244,12 @@ std::string RequestParse::getPath (){
         「request lineに含まれるpath」と「configのroot」を連結したpathを返す関数。
     */
     return pathFromConfRoot;
+}
+std::string RequestParse::getQueryString (){
+    /*
+        「request lineに含まれるpath」と「configのroot」を連結したpathを返す関数。
+    */
+    return queryString;
 }
 std::string RequestParse::getVersion(){
     return version;

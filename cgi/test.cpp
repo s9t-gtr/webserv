@@ -26,7 +26,7 @@ int main(void){
   strOutData += "Connection: Keep-Alive\n";
   strOutData += "Content-Type: text/html\n";
   strOutData += "\n";
-  strOutData += responseBody;
+  strOutData += "<html><body><h1>This page made by CGI!</h1></body></html>\n\n";
 
   std::cout << strOutData.c_str();
 }
