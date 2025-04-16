@@ -165,11 +165,19 @@ void HttpConnection::recvEofTimerHandler(progressInfo *obj){
     }
 }
 
+void createQueryString(RequestParse *requestInfo) {
+    std::string path = requestInfo->getPath();
+    std::string::size_type idx = path.find("?");
+    if(idx == std::string::npos) { return ; }
+    requestInfo->setPathFromConfRoot(path.substr(0, idx));
+    requestInfo->setQueryString(path.substr(idx+1));
+}
 void HttpConnection::sendHandler(progressInfo *obj, Config *conf){
     // std::cerr << DEBUG << LIGHT_BLUE BOLD <<  "Status: Send" << RESET << std::endl;
     try{
         RequestParse requestInfo(obj->buffer, conf); //例外発生元はこれ
         obj->requestPath = requestInfo.getPath();
+        createQueryString(&requestInfo);
         obj->httpConnection->sendResponse(requestInfo, obj);
     }catch(std::runtime_error){
         return obj->httpConnection->sendBadRequestPage(obj);
@@ -226,17 +234,18 @@ bool HttpConnection::isAllowedMethod(Location* location, std::string method)
 }
 
 bool isCgi(RequestParse& requestInfo)
-{
+{   
     std::string path = requestInfo.getPath();
-    if (path.length() >= 4) {
-        std::string lastFourChars = path.substr(path.length() - 4);
-        
-        if (lastFourChars == ".cgi") {
-            return true;
-        } else {
-            return false;
-        }
-    }
+    std::string::size_type pathLength = path.size();
+    const std::string pythonExtension = ".py";
+    const std::string cgiExtension = ".cgi";
+    if(path.find(".") == std::string::npos)
+        return false;
+    if(path.substr(pathLength > cgiExtension.size() ? pathLength - cgiExtension.size() : 0) == cgiExtension)
+        return true;
+    if(path.substr(pathLength > pythonExtension.size() ? pathLength - pythonExtension.size() : 0) == pythonExtension)
+        return true;
+
     return false;
 }
 
@@ -268,7 +277,7 @@ void HttpConnection::sendResponse(RequestParse& requestInfo, progressInfo *obj){
             obj->pHandler = confirmExitStatusFromCgi;
             pid_t pid = fork();
             if(pid == 0){
-                executeCgi(requestInfo, pipe_c2p);
+                executeCgi(obj, requestInfo, pipe_c2p);
             } else if(pid > 0) {
                 obj->childPid = pid;
                 createNewEvent(obj->socket, EVFILT_WRITE, EV_DELETE, 0, 0, obj);
@@ -305,17 +314,56 @@ void HttpConnection::sendResponse(RequestParse& requestInfo, progressInfo *obj){
         sendNotImplementedPage(obj);
 }
 
+void HttpConnection::createEnviron(progressInfo *obj, RequestParse &requestInfo, char **environ){
+    MetaVariables metaVariables;
 
-void HttpConnection::executeCgi(RequestParse& requestInfo, int pipe_c2p[2]){
+    size_t i = 0;
+    size_t numEnvironLine = 0;
+    while(environ[i++] != NULL){
+        numEnvironLine++;
+    }
+    obj->holdMetaVariableEnviron = (char **)std::malloc((numEnvironLine + metaVariables.count() + 1) * sizeof(char *));
+    i = 0;
+    while(i < numEnvironLine){
+        obj->holdMetaVariableEnviron[i] = strdup(environ[i]);
+        i++;
+    }
+    for (std::map<std::string, EnvironFunction>::iterator it = metaVariables.variablesToFuncPtr.begin(); it!=metaVariables.variablesToFuncPtr.end(); it++){
+        it->second(obj, requestInfo, i++);
+    }
+    obj->holdMetaVariableEnviron[i] = NULL;
+    
+}
+void HttpConnection::executeCgi(progressInfo *obj, RequestParse &requestInfo,  int pipe_c2p[2]){
     close(pipe_c2p[R]);
     dup2(pipe_c2p[W],1);
     close(pipe_c2p[W]);
+    std::string script = requestInfo.getPath();
+    if(script.size() > 3 && script.substr(0, 2) == "./") {
+        script = script.substr(2);
+    }
     extern char** environ;
-    std::string path = requestInfo.getPath();
-    char* const cgi_argv[] = { const_cast<char*>(path.c_str()), NULL };
-    const char* cPath = path.c_str();
-    if(execve(cPath, cgi_argv, environ) < 0)
+    createEnviron(obj, requestInfo, environ);
+    // std::cerr << "=== Environment Variables Before execve ===\n";
+    // for (char **env = obj->holdMetaVariableEnviron; *env; ++env) {
+    //     std::cerr << *env << std::endl;
+    // }
+    // std::cerr << "===========================================\n";
+    // std::cerr << script << std::endl;
+    if(script.substr(script.length() - 3) == ".py"){
+		const char* script_c = script.c_str();
+        char* const cgi_argv[] = { NULL };
+        if(execve(script_c, cgi_argv, obj->holdMetaVariableEnviron) < 0){
+			perror("execve");
+            exit(1);
+		}
+    }
+    const char* cPath = script.c_str();
+    // std::cout << "cPath: " << cPath << std::endl;
+    char* const cgi_argv[] = { const_cast<char*>(cPath), NULL };
+    if(execve(cPath, cgi_argv, obj->holdMetaVariableEnviron) < 0){
         exit(1);
+    }
 }
 
 void HttpConnection::confirmExitStatusFromCgi(progressInfo *obj){

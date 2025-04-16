@@ -19,6 +19,7 @@ class RequestParse{
     public:
         std::string getMethod();
         std::string getPath();
+        std::string getQueryString();
         std::string getRawPath();
         std::string getVersion();
         std::string getHeader(std::string header);
@@ -29,7 +30,8 @@ class RequestParse{
         Location *getLocation();
         bool searchSessionId(std::string cookieInfo);
         std::vector<std::string> getUserInfo(std::string cookieInfo);
-
+        void setPathFromConfRoot(std::string newPath);
+        void setQueryString(std::string newQueryString);
     private: 
         std::string getRequestLine(std::string& requestMessage);
         void setMethodPathVersion(std::string& requestMessage);
@@ -44,17 +46,15 @@ class RequestParse{
         Location* getLocationSetting();
         std::string selectBestMatchLocation(std::map<std::string, Location*> &locations);
         void createPathFromConfRoot();
-
         //cookie/sessions
         std::string getSessionId(std::string cookieInfo);
-
-
     private:
 
     private:
         std::string method;
         std::string rawPath;
         std::string pathFromConfRoot;
+        std::string queryString;
         std::string version;
         headersMap headers;
         std::string body;

@@ -200,7 +200,12 @@ void RequestParse::setCorrespondServer(Config *conf){
 void RequestParse::setCorrespondLocation(){
     location = getLocationSetting();
 }
-
+void RequestParse::setPathFromConfRoot(std::string newPath) {
+    pathFromConfRoot = newPath;
+}
+void RequestParse::setQueryString(std::string newQueryString){
+    queryString = newQueryString;
+}
 void RequestParse::createPathFromConfRoot(){
     /*
         「configのrootディレクティブで設定されたpath」と「request lineで指定されたpath」を連結する関数。
@@ -236,6 +241,12 @@ std::string RequestParse::getPath (){
         「request lineに含まれるpath」と「configのroot」を連結したpathを返す関数。
     */
     return pathFromConfRoot;
+}
+std::string RequestParse::getQueryString (){
+    /*
+        「request lineに含まれるpath」と「configのroot」を連結したpathを返す関数。
+    */
+    return queryString;
 }
 std::string RequestParse::getVersion(){
     return version;
