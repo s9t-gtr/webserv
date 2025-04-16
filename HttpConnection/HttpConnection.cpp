@@ -1,7 +1,7 @@
 #include "HttpConnection.hpp"
 
 int HttpConnection::kq;
-struct kevent *HttpConnection::eventlist;
+struct kevent HttpConnection::eventlist[1000];
 timespec HttpConnection::timeSpec = {0,0};
 // timespec HttpConnection::timeSpec = {0,100000000}
 HttpConnection::HttpConnection(){}
@@ -23,7 +23,6 @@ void HttpConnection::destroy(HttpConnection* inst){
 void HttpConnection::connectionPrepare(socketSet tcpSockets){
     createKqueue();
     createEventOfEstablishTcpConnection(tcpSockets);
-    eventlist = new struct kevent[tcpSockets.size()*6]; //最近のブラウザは最大6つのtcpコネクションを確立するらしいのでtcpSockets*6倍のイベント容量を用意する
 }
 
 void HttpConnection::createKqueue(){
