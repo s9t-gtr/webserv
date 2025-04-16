@@ -37,8 +37,6 @@ static std::string getDisplayedDate(const struct dirent *entry, std::string path
     std::string path(path_fixed);
     path += entry->d_name;
     struct stat path_stat;
-    if (stat(path.c_str(), &path_stat) < 0)
-        perror("stat");
     char date_str[256];
     struct tm *mtime = gmtime(&path_stat.st_mtimespec.tv_sec);
     strftime(date_str, 256, "%d-%b-%Y %H:%M", mtime);
@@ -52,8 +50,6 @@ static std::string getDisplayedSize(const struct dirent *entry, std::string path
     std::string path(path_fixed);
     path += entry->d_name;
     struct stat path_stat;
-    if (stat(path.c_str(), &path_stat) < 0)
-        perror("stat");
     std::stringstream ss;
     if (S_ISDIR(path_stat.st_mode))
         ss << "-";
@@ -137,7 +133,7 @@ void HttpConnection::sendAutoindexPage(RequestParse& requestInfo, progressInfo *
     } else if (info.st_mode & S_IFDIR) {
         // パスがディレクトリである場合
         std::string response = createAutoindexPage(requestInfo, path);
-        sendToClient(response, obj, NORMAL);
+        sendToClient(response, obj);
     } else {
         // パスがディレクトリではない場合(ファイルの時)
         return sendStaticPage(requestInfo, obj);

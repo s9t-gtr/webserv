@@ -29,8 +29,8 @@ typedef struct progressInfo{
     pid_t childPid;
     bool eofTimer; //true: on
     int sndbuf;
-    int tmpKind;
     std::string requestPath;
+    bool isClose;
 
     char **holdMetaVariableEnviron;
     ~progressInfo() {
@@ -58,9 +58,7 @@ typedef std::map<int, struct kevent*> keventMap;
 #define CGI_FAIL 1
 #define BAD_REQ 2
 #define RECV 3
-#define FORK 4
 #define SEND 5
-#define CLOSE 6
 
 class HttpConnection{
     private:
@@ -88,12 +86,12 @@ class HttpConnection{
         void sendResponse(RequestParse& requestInfo, progressInfo *obj);
         void executeCgi(progressInfo *obj, RequestParse &requestInfo,  int pipe_c2p[2]);
 
-        void sendToClient(std::string response, progressInfo *obj, int kind);
+        static void sendToClient(std::string response, progressInfo *obj);
         static std::string getStringFromHtml(std::string wantHtmlPath);
         void sendDefaultErrorPage(VirtualServer* server, progressInfo *obj);
         void sendAutoindexPage(RequestParse& requestInfo, progressInfo *obj);
         std::string createAutoindexPage(RequestParse& requestInfo, std::string path);
-        std::string getGmtDate();
+        static std::string getGmtDate();
         void sendStaticPage(RequestParse& requestInfo, progressInfo *obj);
         void createResponse(std::string statusLine, std::string content);
         void sendRedirectPage(Location* location, progressInfo *obj);
@@ -107,7 +105,7 @@ class HttpConnection{
 
 
         bool isAllowedMethod(Location* location, std::string method);
-        void sendInternalErrorPage(progressInfo *obj, int kind);
+        static void sendInternalErrorPage(progressInfo *obj, Config *config);
         void sendBadRequestPage(progressInfo *obj);
 
         bool isReadNewLine(std::string buffer);
